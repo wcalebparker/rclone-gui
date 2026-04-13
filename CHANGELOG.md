@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.4 — App icon + installation fix
+- Added app icon (orange square with ⇄ arrows)
+- Fixed "damaged or incomplete" error on macOS by including an installer script
+- Open the DMG and double-click "Install rclone GUI" to install — it copies the app and removes the macOS security flag automatically
+
 ## v1.0.3 — Fix app bundle
 - Fixed app crashing on launch when downloaded from GitHub
 - Fixed rclone download location when running as installed .app

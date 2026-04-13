@@ -21,7 +21,7 @@ app = Flask(__name__,
             static_folder=os.path.join(BUNDLE_DIR, 'static'))
 ANSI = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 active_jobs = {}
-APP_VERSION = "1.0.3"
+APP_VERSION = "1.0.4"
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────

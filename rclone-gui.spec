@@ -66,13 +66,13 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name='rclone GUI.app',
-    icon=None,
+    icon='appicon.icns',
     bundle_identifier='com.wcalebparker.rclone-gui',
     info_plist={
         'CFBundleName': 'rclone GUI',
         'CFBundleDisplayName': 'rclone GUI',
-        'CFBundleShortVersionString': '1.0.3',
-        'CFBundleVersion': '1.0.3',
+        'CFBundleShortVersionString': '1.0.4',
+        'CFBundleVersion': '1.0.4',
         'NSHighResolutionCapable': True,
         'LSBackgroundOnly': False,
         'LSMinimumSystemVersion': '10.15',

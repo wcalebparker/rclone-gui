@@ -23,7 +23,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install Python dependencies
-        run: pip install flask pyinstaller
+        run: pip install flask pyinstaller pillow
 
       - name: Install create-dmg
         run: brew install create-dmg
@@ -35,6 +35,9 @@ jobs:
       - name: Update version in app.py
         run: |
           sed -i '' "s/APP_VERSION = \".*\"/APP_VERSION = \"${{ steps.version.outputs.VERSION }}\"/" app.py
+
+      - name: Generate app icon
+        run: python3 make_icon.py
 
       - name: Build with PyInstaller
         run: pyinstaller rclone-gui.spec --noconfirm
@@ -53,15 +56,16 @@ jobs:
           VER="${{ steps.version.outputs.VERSION }}"
           mkdir -p dist/dmg_staging
           cp -R "dist/rclone GUI.app" dist/dmg_staging/
+          cp "Install rclone GUI.command" dist/dmg_staging/
 
           create-dmg \
             --volname "rclone GUI" \
             --window-pos 200 120 \
-            --window-size 600 400 \
+            --window-size 660 420 \
             --icon-size 100 \
-            --icon "rclone GUI.app" 175 190 \
+            --icon "rclone GUI.app" 180 200 \
+            --icon "Install rclone GUI.command" 460 200 \
             --hide-extension "rclone GUI.app" \
-            --app-drop-link 425 190 \
             --no-internet-enable \
             "dist/rclone-GUI-v${VER}.dmg" \
             "dist/dmg_staging/" || \
