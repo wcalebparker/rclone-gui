@@ -21,7 +21,7 @@ app = Flask(__name__,
             static_folder=os.path.join(BUNDLE_DIR, 'static'))
 ANSI = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 active_jobs = {}
-APP_VERSION = "1.0.4"
+APP_VERSION = "1.0.5"
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
@@ -474,11 +474,31 @@ if __name__ == '__main__':
     import time
     print('rclone GUI → http://localhost:5001')
 
-    # When running as a bundled .app, open the browser automatically
-    # after a short delay to let Flask start up.
+    # When running as a bundled .app, open the browser automatically.
+    # Poll until Flask is actually serving before opening — don't guess with a timer.
     if FROZEN:
+        # Check if another instance is already running
+        import urllib.request as _ur
+        already_running = False
+        try:
+            _ur.urlopen('http://127.0.0.1:5001', timeout=0.5)
+            already_running = True
+        except Exception:
+            pass
+
+        if already_running:
+            # Just open the browser to the existing instance and exit
+            webbrowser.open('http://localhost:5001')
+            sys.exit(0)
+
+        # Not running yet — open browser once Flask is ready
         def _open_browser():
-            time.sleep(1.2)
+            for _ in range(40):
+                try:
+                    _ur.urlopen('http://127.0.0.1:5001', timeout=0.5)
+                    break
+                except Exception:
+                    time.sleep(0.5)
             webbrowser.open('http://localhost:5001')
         threading.Thread(target=_open_browser, daemon=True).start()
 

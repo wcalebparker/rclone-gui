@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.5 — Fix app not launching on double-click
+- Fixed app flashing and disappearing on launch (macOS was killing it for having no native window)
+- Added LSUIElement so macOS treats the app as a background agent — no dock bounce, no window needed
+- Browser now waits for the server to actually be ready before opening (no more timing guesses)
+- If the app is already running, double-clicking opens the browser instead of crashing
+
 ## v1.0.4 — App icon + installation fix
 - Added app icon (orange square with ⇄ arrows)
 - Fixed "damaged or incomplete" error on macOS by including an installer script

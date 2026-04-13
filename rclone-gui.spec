@@ -46,7 +46,7 @@ exe = EXE(
     upx=True,
     console=False,          # No terminal window
     disable_windowed_traceback=False,
-    argv_emulation=True,    # macOS: handle Apple Events (open/quit)
+    argv_emulation=False,   # Must be False — True intercepts Apple Events and kills startup
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
@@ -71,9 +71,10 @@ app = BUNDLE(
     info_plist={
         'CFBundleName': 'rclone GUI',
         'CFBundleDisplayName': 'rclone GUI',
-        'CFBundleShortVersionString': '1.0.4',
-        'CFBundleVersion': '1.0.4',
+        'CFBundleShortVersionString': '1.0.5',
+        'CFBundleVersion': '1.0.5',
         'NSHighResolutionCapable': True,
+        'LSUIElement': True,          # Background agent — no dock bounce, no window required
         'LSBackgroundOnly': False,
         'LSMinimumSystemVersion': '10.15',
         'NSRequiresAquaSystemAppearance': False,
