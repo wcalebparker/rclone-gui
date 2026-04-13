@@ -1,4 +1,4 @@
-import os, re, json, queue, shutil, threading, subprocess, uuid, platform, signal, sys
+import os, re, json, queue, shutil, threading, subprocess, uuid, platform, signal, sys, ssl
 import urllib.request, zipfile, configparser, webbrowser
 from flask import Flask, render_template, jsonify, request, Response, stream_with_context
 
@@ -21,7 +21,22 @@ app = Flask(__name__,
             static_folder=os.path.join(BUNDLE_DIR, 'static'))
 ANSI = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 active_jobs = {}
-APP_VERSION = "1.0.5"
+APP_VERSION = "1.0.6"
+
+def ssl_ctx():
+    """Return an SSL context that works inside a PyInstaller bundle.
+    Uses certifi's bundled CA certificates so HTTPS works without
+    relying on macOS system certificate paths (which PyInstaller can't find)."""
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        return ssl.create_default_context()
+
+def https_get(url, timeout=15):
+    """Perform a simple HTTPS GET and return the response object."""
+    req = urllib.request.Request(url, headers={'User-Agent': f'rclone-gui/{APP_VERSION}'})
+    return urllib.request.urlopen(req, timeout=timeout, context=ssl_ctx())
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
@@ -108,7 +123,7 @@ def check_app_update():
         req = urllib.request.Request(
             'https://api.github.com/repos/wcalebparker/rclone-gui/releases/latest',
             headers={'User-Agent': 'rclone-gui/' + APP_VERSION, 'Accept': 'application/vnd.github+json'})
-        with urllib.request.urlopen(req, timeout=8) as resp:
+        with urllib.request.urlopen(req, timeout=8, context=ssl_ctx()) as resp:
             data = json.loads(resp.read().decode())
         latest = data.get('tag_name', '').lstrip('v')
         if not latest:
@@ -150,11 +165,20 @@ def _install_rclone(jid):
 
         q.put({'type': 'status', 'text': 'Downloading…'})
 
-        def hook(n, bs, total):
-            if total > 0:
-                q.put({'type': 'progress', 'pct': min(99, int(n * bs * 100 / total))})
-
-        urllib.request.urlretrieve(url, tmp_zip, reporthook=hook)
+        # Stream download with progress (urlretrieve doesn't support SSL context)
+        with https_get(url) as resp:
+            total = int(resp.headers.get('Content-Length', 0))
+            downloaded = 0
+            chunk_size = 65536
+            with open(tmp_zip, 'wb') as f:
+                while True:
+                    chunk = resp.read(chunk_size)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if total > 0:
+                        q.put({'type': 'progress', 'pct': min(99, int(downloaded * 100 / total))})
         q.put({'type': 'status', 'text': 'Unpacking…'})
 
         with zipfile.ZipFile(tmp_zip, 'r') as zf:
@@ -304,10 +328,7 @@ def check_update():
         m = re.search(r'v(\d+\.\d+\.\d+)', current_line)
         current = m.group(1) if m else ''
 
-        req = urllib.request.Request(
-            'https://downloads.rclone.org/version.txt',
-            headers={'User-Agent': 'rclone-gui/1.0'})
-        with urllib.request.urlopen(req, timeout=8) as resp:
+        with https_get('https://downloads.rclone.org/version.txt', timeout=8) as resp:
             latest_raw = resp.read().decode().strip()
         m2 = re.search(r'v(\d+\.\d+\.\d+)', latest_raw)
         latest = m2.group(1) if m2 else ''

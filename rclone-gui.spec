@@ -21,6 +21,8 @@ a = Analysis(
         'werkzeug.routing',
         'werkzeug.exceptions',
         'click',
+        'certifi',
+        'ssl',
     ],
     hookspath=[],
     hooksconfig={},
@@ -71,8 +73,8 @@ app = BUNDLE(
     info_plist={
         'CFBundleName': 'rclone GUI',
         'CFBundleDisplayName': 'rclone GUI',
-        'CFBundleShortVersionString': '1.0.5',
-        'CFBundleVersion': '1.0.5',
+        'CFBundleShortVersionString': '1.0.6',
+        'CFBundleVersion': '1.0.6',
         'NSHighResolutionCapable': True,
         'LSUIElement': True,          # Background agent — no dock bounce, no window required
         'LSBackgroundOnly': False,

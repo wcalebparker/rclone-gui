@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.6 — Fix SSL certificate error when downloading rclone
+- Fixed "CERTIFICATE_VERIFY_FAILED" error on first launch when downloading rclone
+- Bundled SSL certificates (certifi) so HTTPS works inside the packaged app
+
 ## v1.0.5 — Fix app not launching on double-click
 - Fixed app flashing and disappearing on launch (macOS was killing it for having no native window)
 - Added LSUIElement so macOS treats the app as a background agent — no dock bounce, no window needed
