@@ -1,12 +1,27 @@
-import os, re, json, queue, shutil, threading, subprocess, uuid, platform, signal
+import os, re, json, queue, shutil, threading, subprocess, uuid, platform, signal, sys
 import urllib.request, zipfile, configparser, webbrowser
 from flask import Flask, render_template, jsonify, request, Response, stream_with_context
 
-app = Flask(__name__)
+# ── PyInstaller bundle detection ───────────────────────────────────────────
+# When frozen by PyInstaller:
+#   sys.frozen     = True
+#   sys._MEIPASS   = temp dir where templates/static are extracted
+#   sys.executable = path to the actual binary inside the .app
+FROZEN      = getattr(sys, 'frozen', False)
+BUNDLE_DIR  = sys._MEIPASS if FROZEN else os.path.dirname(os.path.abspath(__file__))
+APP_DIR     = os.path.dirname(sys.executable) if FROZEN else os.path.dirname(os.path.abspath(__file__))
+
+# When bundled, store rclone in ~/Library/Application Support so it persists
+# across app updates (the .app bundle itself is read-only after install).
+RCLONE_DATA_DIR = os.path.expanduser('~/Library/Application Support/rclone-gui')
+os.makedirs(RCLONE_DATA_DIR, exist_ok=True)
+
+app = Flask(__name__,
+            template_folder=os.path.join(BUNDLE_DIR, 'templates'),
+            static_folder=os.path.join(BUNDLE_DIR, 'static'))
 ANSI = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 active_jobs = {}
-APP_DIR = os.path.dirname(os.path.abspath(__file__))
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.3"
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
@@ -15,10 +30,13 @@ def strip_ansi(t):
     return ANSI.sub('', t)
 
 def find_rclone():
-    """Check app folder first, then system PATH."""
-    local = os.path.join(APP_DIR, 'rclone')
-    if os.path.isfile(local) and os.access(local, os.X_OK):
-        return local
+    """Check persistent data dir first, then app folder, then system PATH."""
+    for candidate in [
+        os.path.join(RCLONE_DATA_DIR, 'rclone'),   # bundled app (persistent)
+        os.path.join(APP_DIR, 'rclone'),             # dev/project folder
+    ]:
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
     return shutil.which('rclone')
 
 def rclone_conf_path():
@@ -127,8 +145,8 @@ def _install_rclone(jid):
     try:
         arch = 'arm64' if platform.machine().lower() in ('arm64', 'aarch64') else 'amd64'
         url  = f'https://downloads.rclone.org/rclone-current-osx-{arch}.zip'
-        dest_bin = os.path.join(APP_DIR, 'rclone')
-        tmp_zip  = os.path.join(APP_DIR, '_rclone_dl.zip')
+        dest_bin = os.path.join(RCLONE_DATA_DIR if FROZEN else APP_DIR, 'rclone')
+        tmp_zip  = os.path.join(RCLONE_DATA_DIR if FROZEN else APP_DIR, '_rclone_dl.zip')
 
         q.put({'type': 'status', 'text': 'Downloading…'})
 
@@ -453,5 +471,15 @@ def quit_app():
 # ── Launch ─────────────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
+    import time
     print('rclone GUI → http://localhost:5001')
-    app.run(host='127.0.0.1', port=5001, debug=False)
+
+    # When running as a bundled .app, open the browser automatically
+    # after a short delay to let Flask start up.
+    if FROZEN:
+        def _open_browser():
+            time.sleep(1.2)
+            webbrowser.open('http://localhost:5001')
+        threading.Thread(target=_open_browser, daemon=True).start()
+
+    app.run(host='127.0.0.1', port=5001, debug=False, use_reloader=False)

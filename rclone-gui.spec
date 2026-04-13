@@ -39,14 +39,14 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='rclone-gui-server',
+    name='rclone GUI',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,
+    console=False,          # No terminal window
     disable_windowed_traceback=False,
-    argv_emulation=False,
+    argv_emulation=True,    # macOS: handle Apple Events (open/quit)
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
@@ -60,7 +60,7 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='rclone-gui-server',
+    name='rclone GUI',
 )
 
 app = BUNDLE(
@@ -69,12 +69,13 @@ app = BUNDLE(
     icon=None,
     bundle_identifier='com.wcalebparker.rclone-gui',
     info_plist={
-        'CFBundleShortVersionString': '1.0.0',
-        'CFBundleVersion': '1.0.0',
+        'CFBundleName': 'rclone GUI',
+        'CFBundleDisplayName': 'rclone GUI',
+        'CFBundleShortVersionString': '1.0.3',
+        'CFBundleVersion': '1.0.3',
         'NSHighResolutionCapable': True,
         'LSBackgroundOnly': False,
-        'NSRequiresAquaSystemAppearance': False,
-        'CFBundleExecutable': 'rclone GUI',
         'LSMinimumSystemVersion': '10.15',
+        'NSRequiresAquaSystemAppearance': False,
     },
 )
