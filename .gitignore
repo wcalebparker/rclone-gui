@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+env/
+venv/
+.env
+
+# PyInstaller
+build/
+dist/
+*.spec
+!rclone-gui.spec
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+*.app/
+*.dmg
+
+# Logs
+*.log
+/tmp/
+
+# rclone binary (big, downloaded at runtime)
+/rclone
+
+# Dev artifacts
+_rclone_dl.zip
+.claude/

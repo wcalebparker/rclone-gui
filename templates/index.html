@@ -1,0 +1,1876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>rclone GUI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --accent:  #D4622A;
+  --accent2: #B84E1E;
+  --green:   #3AAD68;
+  --red:     #E05050;
+  --bg:      #181818;
+  --surface: #242424;
+  --surface2:#2e2e2e;
+  --border:  #3d3d3d;
+  --text:    #e8e8e8;
+  --muted:   #999999;
+  --faint:   #555555;
+  --r:       14px;
+  --shadow:  0 2px 10px rgba(0,0,0,0.3);
+  --shadow2: 0 8px 40px rgba(0,0,0,0.55);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg); color: var(--text); font-size: 15px;
+  min-height: 100vh; -webkit-font-smoothing: antialiased;
+}
+
+/* ── SCREEN SYSTEM ──────────────────────────────────────── */
+.screen { display: none; min-height: 100vh; }
+.screen.active { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 16px; }
+.screen.active.top { align-items: stretch; justify-content: flex-start; padding: 0; }
+#screen-app.active { align-items: stretch; justify-content: flex-start; padding: 0; }
+
+/* ── CARDS ──────────────────────────────────────────────── */
+.card {
+  background: var(--surface); border-radius: var(--r);
+  padding: 40px 36px; max-width: 520px; width: 100%;
+  box-shadow: var(--shadow2); text-align: center;
+}
+.card .emoji { font-size: 52px; display: block; margin-bottom: 18px; }
+.card h1 { font-size: 24px; font-weight: 700; margin-bottom: 10px; letter-spacing: -0.3px; }
+.card p  { color: var(--muted); line-height: 1.65; }
+
+/* ── BUTTONS ────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 11px 22px; border-radius: 10px; border: none;
+  font-size: 15px; font-weight: 600; cursor: pointer;
+  transition: filter 0.15s, transform 0.1s;
+}
+.btn:active:not(:disabled) { transform: scale(0.97); }
+.btn:disabled { opacity: 0.38; cursor: not-allowed; }
+.btn-accent { background: var(--accent); color: #fff; }
+.btn-accent:hover:not(:disabled) { background: var(--accent2); filter: none; }
+.btn-green  { background: var(--green);  color: #fff; }
+.btn-ghost  { background: transparent; color: var(--accent); border: 1.5px solid var(--border); }
+.btn-ghost:hover:not(:disabled) { background: rgba(212,98,42,0.13); border-color: var(--accent); filter: none; }
+.btn-subtle { background: var(--surface2); color: var(--muted); border: 1.5px solid var(--border); font-size: 13px; }
+.btn:hover:not(:disabled) { filter: brightness(0.93); }
+.btn-full { width: 100%; margin-top: 10px; }
+.btn-lg { padding: 14px 28px; font-size: 16px; border-radius: 12px; }
+
+/* ── PROGRESS BAR ───────────────────────────────────────── */
+.progress-wrap { background: var(--surface2); border-radius: 99px; height: 8px; overflow: hidden; margin: 20px 0 8px; }
+.progress-bar  { height: 100%; background: linear-gradient(90deg, var(--accent), #E8720A); border-radius: 99px; transition: width 0.4s ease; width: 0%; }
+.progress-label { font-size: 13px; color: var(--muted); }
+
+/* ── PROVIDER GRID ──────────────────────────────────────── */
+.providers-screen .card { max-width: 620px; }
+.providers-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+  margin: 24px 0 8px;
+}
+.provider-btn {
+  background: var(--bg); border: 2px solid var(--border);
+  border-radius: 12px; padding: 18px 8px;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  cursor: pointer; transition: all 0.15s; text-decoration: none; color: var(--text);
+}
+.provider-btn:hover { border-color: var(--accent); background: rgba(212,98,42,0.1); transform: translateY(-2px); box-shadow: var(--shadow); }
+.provider-btn .p-icon     { font-size: 32px; line-height: 1; }
+.provider-btn .p-icon-img { width: 40px; height: 40px; object-fit: contain; }
+.provider-btn .p-name     { font-size: 13px; font-weight: 600; }
+.provider-btn .p-note     { font-size: 11px; color: var(--faint); }
+
+/* ── CONNECT FORM ───────────────────────────────────────── */
+.connect-screen .card { text-align: left; }
+.connect-screen .card h1 { text-align: center; }
+.connect-screen .card > p { text-align: center; margin-bottom: 24px; }
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.field label { font-size: 13px; font-weight: 600; color: var(--muted); }
+.field input, .field select {
+  padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 9px;
+  font-size: 15px; color: var(--text); background: var(--surface); outline: none;
+  transition: border-color 0.15s;
+}
+.field input:focus, .field select:focus { border-color: var(--accent); }
+
+/* ── BROWSER WAIT ───────────────────────────────────────── */
+.browser-wait {
+  background: rgba(212,98,42,0.1); border: 1.5px solid rgba(212,98,42,0.28);
+  border-radius: 12px; padding: 20px; text-align: center; margin: 20px 0;
+  display: none;
+}
+.browser-wait.show { display: block; }
+.browser-wait p { color: var(--accent); font-weight: 500; margin-top: 8px; font-size: 14px; }
+
+/* ── SPINNER ────────────────────────────────────────────── */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin {
+  width: 18px; height: 18px; border: 2.5px solid currentColor;
+  border-top-color: transparent; border-radius: 50%;
+  animation: spin 0.7s linear infinite; display: inline-block;
+}
+.spin-accent { color: var(--accent); }
+.spin-white  { color: #fff; }
+
+/* ── MAIN APP ───────────────────────────────────────────── */
+#app-screen {
+  background: var(--bg); min-height: 100vh;
+  display: flex; flex-direction: column;
+}
+
+.app-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px; height: 58px;
+  display: flex; align-items: center; gap: 12px;
+}
+.app-header-brand { display: flex; align-items: center; gap: 10px; }
+.app-header-logo {
+  width: 30px; height: 30px;
+  background: linear-gradient(135deg, #E8720A 0%, #CC5200 100%);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; flex-shrink: 0;
+}
+.app-header h1 { font-size: 16px; font-weight: 700; letter-spacing: -0.2px; color: var(--text); }
+.ver-badge {
+  font-size: 11px; color: var(--faint); background: var(--surface2);
+  border: 1px solid var(--border); border-radius: 20px; padding: 2px 8px;
+  font-weight: 500;
+}
+.header-spacer { flex: 1; }
+.remote-pills { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
+.remote-pill {
+  background: rgba(58,173,104,0.14); border: 1px solid rgba(58,173,104,0.28);
+  color: #5ecf8a; font-size: 11px; font-weight: 600;
+  padding: 3px 9px; border-radius: 20px; letter-spacing: 0.01em;
+}
+
+.app-body {
+  flex: 1; padding: 24px;
+  max-width: 860px; width: 100%; margin: 0 auto;
+  display: flex; flex-direction: column; gap: 16px;
+}
+
+/* ── FROM / TO CARDS ────────────────────────────────────── */
+.transfer-grid {
+  display: grid; grid-template-columns: 1fr 44px 1fr; gap: 10px; align-items: center;
+}
+.endpoint-card {
+  background: var(--surface); border-radius: var(--r); padding: 20px; box-shadow: var(--shadow);
+}
+.endpoint-card h2 {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 14px;
+}
+.ep-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+.ep-field:last-child { margin-bottom: 0; }
+.ep-label { font-size: 12px; font-weight: 500; color: var(--faint); }
+.ep-row { display: flex; gap: 6px; }
+.ep-row select, .ep-row input, .ep-field select, .ep-field input {
+  padding: 9px 11px; border: 1.5px solid var(--border); border-radius: 8px;
+  font-size: 14px; color: var(--text); background: var(--surface); outline: none;
+  transition: border-color 0.15s;
+}
+.ep-row select:focus, .ep-row input:focus,
+.ep-field select:focus, .ep-field input:focus { border-color: var(--accent); }
+.ep-row select { flex: 1; cursor: pointer; }
+.ep-row input  { flex: 1; }
+.browse-btn {
+  padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 8px;
+  background: var(--bg); font-size: 13px; cursor: pointer; color: var(--muted); white-space: nowrap;
+  transition: all 0.15s;
+}
+.browse-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.swap-btn {
+  width: 44px; height: 44px; background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: 50%; cursor: pointer; font-size: 18px; color: var(--muted);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: var(--shadow); transition: all 0.15s; align-self: center;
+}
+.swap-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── OPTIONS + ACTIONS ──────────────────────────────────── */
+.options-row {
+  display: flex; align-items: center; gap: 16px;
+}
+.chk-label {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  color: var(--muted); font-size: 14px;
+}
+.chk-label input { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
+
+.actions-row { display: flex; gap: 10px; }
+.actions-row .btn { min-width: 160px; }
+
+/* ── ERROR INLINE ───────────────────────────────────────── */
+.inline-err {
+  background: rgba(224,80,80,0.12); border: 1px solid rgba(224,80,80,0.28);
+  color: var(--red); border-radius: 9px; padding: 11px 14px; font-size: 14px; display: none;
+}
+.inline-err.show { display: block; }
+
+/* ── OUTPUT PANEL ───────────────────────────────────────── */
+.output-wrap {
+  background: #111111; border-radius: var(--r); overflow: hidden;
+  box-shadow: var(--shadow); display: none; border: 1px solid var(--border);
+}
+.output-wrap.show { display: block; }
+.output-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 11px 16px; border-bottom: 1px solid var(--border);
+}
+.output-title { font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: 0.05em; text-transform: uppercase; }
+.status-pill {
+  font-size: 12px; font-weight: 600; padding: 3px 11px; border-radius: 20px;
+}
+.pill-run  { background: rgba(255,149,0,.2);  color: #FF9500; }
+.pill-ok   { background: rgba(52,199,89,.2);  color: #34C759; }
+.pill-err  { background: rgba(255,59,48,.2);  color: #FF3B30; }
+#output-log {
+  font-family: 'SF Mono','Fira Code','Menlo',monospace; font-size: 12.5px;
+  line-height: 1.65; color: #E5E5EA; padding: 16px;
+  max-height: 340px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;
+}
+#output-log .l-info { color: #E5E5EA; }
+#output-log .l-ok   { color: #30D158; }
+#output-log .l-warn { color: #FF9F0A; }
+#output-log .l-err  { color: #FF453A; }
+#output-log .l-dim  { color: #636366; }
+
+/* ── BROWSE MODAL ───────────────────────────────────────── */
+.modal-bg {
+  position: fixed; inset: 0; background: rgba(0,0,0,.68);
+  backdrop-filter: blur(8px); z-index: 300;
+  display: none; align-items: center; justify-content: center;
+}
+.modal-bg.show { display: flex; }
+
+/* Finder-style window */
+.finder-win {
+  background: var(--surface); border-radius: 12px;
+  width: 720px; max-width: 96vw; height: 500px; max-height: 88vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 24px 80px rgba(0,0,0,.7); overflow: hidden; border: 1px solid var(--border);
+}
+.finder-titlebar {
+  background: var(--bg); border-bottom: 1px solid var(--border);
+  padding: 0 16px; height: 44px; display: flex; align-items: center;
+  flex-shrink: 0;
+}
+.finder-titlebar h3 { flex: 1; font-size: 14px; font-weight: 600; text-align: center; }
+.finder-close {
+  width: 28px; height: 28px; border-radius: 50%; border: none;
+  background: #FF5F57; color: #80100A; font-size: 13px; line-height: 1;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: opacity 0.15s;
+}
+.finder-close:hover { opacity: 0.8; }
+
+/* Breadcrumb bar */
+.finder-crumb {
+  background: var(--bg); border-bottom: 1px solid var(--border);
+  padding: 0 16px; height: 36px; display: flex; align-items: center;
+  gap: 2px; flex-shrink: 0; overflow-x: auto; white-space: nowrap;
+  font-size: 13px;
+}
+.crumb-seg {
+  color: var(--muted); cursor: pointer; padding: 3px 5px; border-radius: 4px;
+  transition: all 0.1s; flex-shrink: 0;
+}
+.crumb-seg:hover { color: var(--accent); background: rgba(212,98,42,0.12); }
+.crumb-seg.last  { color: var(--text); font-weight: 600; cursor: default; }
+.crumb-sep       { color: var(--faint); font-size: 11px; user-select: none; }
+
+/* Two-panel body */
+.finder-body {
+  display: flex; flex: 1; overflow: hidden;
+}
+.finder-sidebar {
+  width: 160px; flex-shrink: 0;
+  background: var(--bg); border-right: 1px solid var(--border);
+  padding: 10px 0; overflow-y: auto;
+}
+.sidebar-section {
+  font-size: 10px; font-weight: 700; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--faint);
+  padding: 6px 16px 4px;
+}
+.sidebar-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 12px 7px 14px; cursor: pointer; font-size: 13px;
+  border-radius: 7px; margin: 1px 6px; transition: all 0.1s;
+  color: var(--text); border: none; background: none; width: calc(100% - 12px);
+  font-family: inherit; font-weight: 500; text-align: left;
+}
+.sidebar-item:hover   { background: rgba(212,98,42,0.14); color: var(--accent); }
+.sidebar-item.current { background: rgba(212,98,42,0.2); color: var(--accent); font-weight: 600; }
+
+/* Folder grid */
+.finder-content {
+  flex: 1; overflow-y: auto; padding: 14px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+  gap: 4px; align-content: start;
+}
+.folder-tile {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 10px 6px 8px; border-radius: 8px; cursor: pointer;
+  transition: background 0.1s; border: 2px solid transparent;
+  text-align: center;
+}
+.folder-tile:hover    { background: rgba(212,98,42,0.13); }
+.folder-tile.selected { background: rgba(212,98,42,0.2); border-color: var(--accent); }
+.folder-tile svg, .folder-tile .tile-emoji { display: block; margin: 0 auto 6px; }
+.tile-emoji { font-size: 40px; line-height: 1; }
+.tile-name  {
+  font-size: 11px; color: var(--text); line-height: 1.3;
+  word-break: break-word;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tile-file  { opacity: 0.45; cursor: default; }
+.tile-file:hover { background: none; }
+.files-divider-grid {
+  grid-column: 1 / -1;
+  font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--faint); padding: 8px 4px 4px; border-top: 1px solid var(--border); margin-top: 4px;
+}
+.finder-empty {
+  grid-column: 1 / -1; text-align: center;
+  padding: 48px 20px; color: var(--muted); font-size: 14px;
+}
+.finder-err {
+  grid-column: 1 / -1; text-align: center;
+  padding: 48px 20px; color: var(--red); font-size: 14px;
+}
+
+/* Footer */
+.finder-footer {
+  border-top: 1px solid var(--border); padding: 10px 16px;
+  display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+  background: var(--bg);
+}
+.finder-footer-path {
+  flex: 1; font-size: 11px; color: var(--muted);
+  font-family: 'SF Mono', monospace;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.modal-msg { padding: 32px; text-align: center; color: var(--muted); font-size: 14px; }
+
+/* ── REMOTE PICKER ──────────────────────────────────────── */
+.remote-picker { position: relative; flex: 1; }
+.rp-trigger {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 11px; border: 1.5px solid var(--border); border-radius: 8px;
+  font-size: 14px; color: var(--text); background: var(--surface);
+  cursor: pointer; transition: border-color 0.15s; user-select: none;
+}
+.rp-trigger:hover, .rp-trigger.open { border-color: var(--accent); }
+.rp-icon { width: 18px; height: 18px; object-fit: contain; flex-shrink: 0; }
+.rp-emoji { font-size: 15px; flex-shrink: 0; line-height: 1; }
+.rp-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rp-chevron {
+  width: 10px; height: 7px; color: var(--muted); flex-shrink: 0;
+  transition: transform 0.15s;
+}
+.rp-trigger.open .rp-chevron { transform: rotate(180deg); }
+.rp-panel {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; min-width: 100%;
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: 10px; box-shadow: var(--shadow2); z-index: 200;
+  overflow: hidden; display: none; max-height: 260px; overflow-y: auto;
+}
+.rp-panel.open { display: block; }
+.rp-option {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 12px; cursor: pointer; font-size: 14px; transition: background 0.1s;
+}
+.rp-option:hover   { background: rgba(212,98,42,0.1); }
+.rp-option.active  { background: rgba(212,98,42,0.16); }
+.rp-opt-icon { width: 18px; height: 18px; object-fit: contain; flex-shrink: 0; }
+.rp-opt-emoji { font-size: 15px; flex-shrink: 0; line-height: 1; width: 18px; text-align: center; }
+.rp-opt-label { color: var(--text); }
+
+/* ── DIVIDER LABEL ──────────────────────────────────────── */
+.or-divider {
+  display: flex; align-items: center; gap: 12px; color: var(--faint);
+  font-size: 13px; margin: 12px 0;
+}
+.or-divider::before, .or-divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--border);
+}
+
+/* ── MORE PROVIDERS ─────────────────────────────────────── */
+.more-toggle {
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  background: none; border: none; color: var(--muted); font-size: 13px;
+  cursor: pointer; padding: 6px 10px; border-radius: 8px;
+  font-family: inherit; font-weight: 500; transition: all 0.15s;
+  width: 100%; margin-top: 2px;
+}
+.more-toggle:hover { color: var(--accent); background: rgba(212,98,42,0.1); }
+.more-panel { display: none; margin-top: 10px; }
+.more-panel.open { display: block; }
+.more-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+}
+.more-grid .provider-btn { padding: 14px 6px; }
+
+/* ── LIST VIEW (cloud browser) ──────────────────────────── */
+.finder-content.list-mode {
+  display: flex; flex-direction: column; padding: 0; gap: 0;
+  align-content: unset;
+}
+.list-row {
+  display: flex; align-items: center; gap: 11px;
+  padding: 8px 16px; cursor: pointer; transition: background 0.1s;
+  border-bottom: 1px solid var(--border); min-height: 38px; flex-shrink: 0;
+}
+.list-row:last-child { border-bottom: none; }
+.list-row:hover { background: rgba(212,98,42,0.12); }
+.list-row.selected { background: rgba(212,98,42,0.2); }
+.list-row.list-file { cursor: default; opacity: 0.55; }
+.list-row.list-file:hover { background: transparent; }
+.list-row-name { flex: 1; font-size: 13.5px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.list-section-hdr {
+  font-size: 10px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--faint);
+  padding: 7px 16px 4px; border-top: 1px solid var(--border);
+  background: var(--bg); flex-shrink: 0;
+}
+.finder-empty.list-mode { padding: 40px; }
+
+/* ── SEARCH BAR (cloud browser) ─────────────────────────── */
+.browse-search-bar {
+  padding: 8px 12px; border-bottom: 1px solid var(--border);
+  background: var(--surface); flex-shrink: 0; display: none;
+}
+.browse-search-bar.show { display: block; }
+.browse-search-bar input {
+  width: 100%; padding: 7px 11px 7px 30px; border: 1.5px solid var(--border);
+  border-radius: 8px; font-size: 13px; background: var(--bg); color: var(--text);
+  outline: none; transition: border-color 0.15s; font-family: inherit;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Ccircle cx='8.5' cy='8.5' r='5' stroke='%23B5A898' stroke-width='1.6'/%3E%3Cpath d='M13 13l3 3' stroke='%23B5A898' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: 8px center; background-size: 15px;
+}
+.browse-search-bar input:focus { border-color: var(--accent); }
+
+/* ── UPDATE BADGE ────────────────────────────────────────── */
+.update-badge {
+  font-size: 11px; background: rgba(255,149,0,0.14); color: #b86b00;
+  border: 1px solid rgba(255,149,0,0.35); border-radius: 20px; padding: 2px 9px;
+  font-weight: 600; cursor: pointer; transition: all 0.15s; white-space: nowrap;
+}
+.update-badge:hover { background: rgba(255,149,0,0.24); }
+</style>
+</head>
+<body>
+
+<!-- ══ 1. LOADING ══════════════════════════════════════════ -->
+<div id="screen-loading" class="screen active">
+  <div class="card">
+    <span class="emoji">⏳</span>
+    <h1>Getting things ready…</h1>
+    <p style="margin-top:6px">Just a moment.</p>
+  </div>
+</div>
+
+<!-- ══ 2. INSTALLING RCLONE ═══════════════════════════════ -->
+<div id="screen-installing" class="screen">
+  <div class="card">
+    <span class="emoji">📦</span>
+    <h1>Setting up the transfer engine</h1>
+    <p>We're downloading a small tool called rclone that handles all the file transfers. This only happens once.</p>
+    <div class="progress-wrap"><div class="progress-bar" id="install-bar"></div></div>
+    <p class="progress-label" id="install-label">Starting…</p>
+    <p id="install-err" style="color:var(--red);margin-top:14px;font-size:14px;display:none"></p>
+    <button class="btn btn-ghost btn-full" id="retry-install-btn" style="display:none;margin-top:12px" onclick="startInstall()">Try again</button>
+  </div>
+</div>
+
+<!-- ══ 3. CHOOSE PROVIDER ═════════════════════════════════ -->
+<div id="screen-providers" class="screen providers-screen">
+  <div class="card">
+    <h1>Where are your files?</h1>
+    <p>Choose a cloud storage to connect, or use folders on this computer — no sign-in needed.</p>
+
+    <div class="providers-grid">
+      <button class="provider-btn" onclick="showConnect('drive','Google Drive','')">
+        <img class="p-icon-img" src="https://api.iconify.design/logos:google-drive.svg" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'p-icon',textContent:'🟡'}))">
+        <span class="p-name">Google Drive</span>
+      </button>
+      <button class="provider-btn" onclick="showConnect('dropbox','Dropbox','')">
+        <img class="p-icon-img" src="https://api.iconify.design/logos:dropbox.svg" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'p-icon',textContent:'💧'}))">
+        <span class="p-name">Dropbox</span>
+      </button>
+      <button class="provider-btn" onclick="showConnect('onedrive','OneDrive','')">
+        <img class="p-icon-img" src="https://api.iconify.design/logos:microsoft-onedrive.svg" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'p-icon',textContent:'🔷'}))">
+        <span class="p-name">OneDrive</span>
+      </button>
+      <button class="provider-btn" onclick="showConnect('box','Box','')">
+        <img class="p-icon-img" src="https://api.iconify.design/logos:box.svg" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'p-icon',textContent:'📦'}))">
+        <span class="p-name">Box</span>
+      </button>
+      <button class="provider-btn" onclick="showS3Connect()">
+        <img class="p-icon-img" src="https://api.iconify.design/logos:aws-s3.svg" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'p-icon',textContent:'🗄️'}))">
+        <span class="p-name">Amazon S3</span>
+        <span class="p-note">Access keys needed</span>
+      </button>
+      <button class="provider-btn" onclick="skipToApp()">
+        <svg class="p-icon-img" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="14" width="44" height="30" rx="4" fill="#E8720A" opacity="0.15"/>
+          <path d="M2 20h44v20a4 4 0 01-4 4H6a4 4 0 01-4-4V20z" fill="#E8720A" opacity="0.3"/>
+          <path d="M2 20h44v20a4 4 0 01-4 4H6a4 4 0 01-4-4V20z" fill="#CC5200" opacity="0.6"/>
+          <path d="M2 20h44v4H2z" fill="#CC5200" opacity="0.4"/>
+          <path d="M6 14h14l4 6H2v-2a4 4 0 014-4z" fill="#E8720A"/>
+        </svg>
+        <span class="p-name">My Computer</span>
+        <span class="p-note">No sign-in needed</span>
+      </button>
+    </div>
+
+    <!-- More providers -->
+    <button class="more-toggle" id="more-toggle" onclick="toggleMoreProviders()">More storage options ▾</button>
+    <div class="more-panel" id="more-panel">
+      <div class="more-grid">
+        <button class="provider-btn" onclick="showConnect('pcloud','pCloud','')">
+          <img class="p-icon-img" src="https://api.iconify.design/simple-icons:pcloud.svg" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'p-icon',textContent:'☁️'}))">
+          <span class="p-name">pCloud</span>
+        </button>
+        <button class="provider-btn" onclick="showConnect('yandex','Yandex Disk','')">
+          <img class="p-icon-img" src="https://api.iconify.design/simple-icons:yandex.svg" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'p-icon',textContent:'🔴'}))">
+          <span class="p-name">Yandex Disk</span>
+        </button>
+        <button class="provider-btn" onclick="showConnect('googlephotos','Google Photos','')">
+          <img class="p-icon-img" src="https://api.iconify.design/logos:google-photos.svg" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'p-icon',textContent:'🖼️'}))">
+          <span class="p-name">Google Photos</span>
+        </button>
+        <button class="provider-btn" onclick="showConnect('jottacloud','Jottacloud','')">
+          <span class="p-icon">🇳🇴</span>
+          <span class="p-name">Jottacloud</span>
+        </button>
+        <button class="provider-btn" onclick="showB2Connect()">
+          <img class="p-icon-img" src="https://api.iconify.design/simple-icons:backblaze.svg" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'p-icon',textContent:'🔥'}))">
+          <span class="p-name">Backblaze B2</span>
+          <span class="p-note">App key needed</span>
+        </button>
+        <button class="provider-btn" onclick="showSFTPConnect()">
+          <span class="p-icon">🖥</span>
+          <span class="p-name">SFTP / FTP</span>
+          <span class="p-note">Server access</span>
+        </button>
+        <button class="provider-btn" onclick="showS3Compat('wasabi')">
+          <img class="p-icon-img" src="https://api.iconify.design/simple-icons:wasabi.svg" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'p-icon',textContent:'🪣'}))">
+          <span class="p-name">Wasabi</span>
+          <span class="p-note">Access keys needed</span>
+        </button>
+        <button class="provider-btn" onclick="showS3Compat('cloudflare')">
+          <img class="p-icon-img" src="https://api.iconify.design/logos:cloudflare.svg" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'p-icon',textContent:'🌤'}))">
+          <span class="p-name">Cloudflare R2</span>
+          <span class="p-note">Account ID + keys</span>
+        </button>
+        <button class="provider-btn" onclick="showConnect('mega','Mega','')">
+          <img class="p-icon-img" src="https://api.iconify.design/simple-icons:mega.svg" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'p-icon',textContent:'📦'}))">
+          <span class="p-name">Mega</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="or-divider" style="margin-top:14px">already connected?</div>
+    <button class="btn btn-subtle btn-full" onclick="skipToApp()">Open the app →</button>
+  </div>
+</div>
+
+<!-- ══ 4. CONNECT OAUTH PROVIDER ══════════════════════════ -->
+<div id="screen-connect" class="screen connect-screen">
+  <div class="card">
+    <div id="connect-icon-wrap" style="display:flex;justify-content:center;margin-bottom:14px">
+      <img id="connect-icon-img" src="" width="56" height="56" style="object-fit:contain" onerror="this.style.display='none'">
+    </div>
+    <h1 id="connect-title">Connect Google Drive</h1>
+    <p>Give this connection a name, then we'll open your browser to sign in.</p>
+
+    <div class="field" style="margin-top:20px">
+      <label>What would you like to call it?</label>
+      <input type="text" id="connect-name" placeholder="e.g. My Google Drive" />
+    </div>
+
+    <div class="browser-wait" id="browser-wait">
+      <span class="spin spin-accent"></span>
+      <p>A browser window has opened.<br>Sign in and come back here when you're done.</p>
+    </div>
+
+    <p id="connect-err" style="color:var(--red);font-size:14px;margin-top:10px;display:none"></p>
+
+    <button class="btn btn-accent btn-full btn-lg" id="connect-go-btn" onclick="doConnect()" style="margin-top:16px">
+      Connect →
+    </button>
+    <button class="btn btn-subtle btn-full" onclick="showScreen('screen-providers')" style="margin-top:8px">← Back</button>
+  </div>
+</div>
+
+<!-- ══ 5. CONNECT S3 ══════════════════════════════════════ -->
+<div id="screen-s3" class="screen connect-screen">
+  <div class="card">
+    <span class="emoji">🗄️</span>
+    <h1>Connect Amazon S3</h1>
+    <p>Enter your AWS credentials. You can find these in your AWS Console under IAM.</p>
+
+    <div class="field" style="margin-top:20px">
+      <label>Connection name</label>
+      <input type="text" id="s3-name" placeholder="e.g. My S3 Bucket" />
+    </div>
+    <div class="field">
+      <label>Access Key ID</label>
+      <input type="text" id="s3-key" placeholder="AKIAIOSFODNN7EXAMPLE" />
+    </div>
+    <div class="field">
+      <label>Secret Access Key</label>
+      <input type="password" id="s3-secret" placeholder="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" />
+    </div>
+    <div class="field">
+      <label>Region</label>
+      <select id="s3-region">
+        <option>us-east-1</option><option>us-east-2</option><option>us-west-1</option>
+        <option>us-west-2</option><option>eu-west-1</option><option>eu-west-2</option>
+        <option>eu-central-1</option><option>ap-southeast-1</option>
+        <option>ap-southeast-2</option><option>ap-northeast-1</option>
+      </select>
+    </div>
+    <p id="s3-err" style="color:var(--red);font-size:14px;margin-top:4px;display:none"></p>
+    <button class="btn btn-accent btn-full btn-lg" onclick="doS3Connect()" style="margin-top:16px">Save →</button>
+    <button class="btn btn-subtle btn-full" onclick="showScreen('screen-providers')" style="margin-top:8px">← Back</button>
+  </div>
+</div>
+
+<!-- ══ 6. CONNECTED! ══════════════════════════════════════ -->
+<div id="screen-connected" class="screen">
+  <div class="card">
+    <span class="emoji">🎉</span>
+    <h1 id="connected-title">Connected!</h1>
+    <p id="connected-msg">Your storage is ready to use.</p>
+    <button class="btn btn-accent btn-full btn-lg" onclick="finishConnect()" style="margin-top:28px">
+      Let's go →
+    </button>
+    <button class="btn btn-subtle btn-full" onclick="showScreen('screen-providers')" style="margin-top:8px">
+      + Connect another
+    </button>
+  </div>
+</div>
+
+<!-- ══ 7. BACKBLAZE B2 ════════════════════════════════════ -->
+<div id="screen-b2" class="screen connect-screen">
+  <div class="card">
+    <span class="emoji">🔥</span>
+    <h1>Connect Backblaze B2</h1>
+    <p>Enter your B2 application key. Create one in the Backblaze web console under <strong>App Keys</strong>.</p>
+    <div class="field" style="margin-top:20px">
+      <label>Connection name</label>
+      <input type="text" id="b2-name" placeholder="e.g. My Backblaze" />
+    </div>
+    <div class="field">
+      <label>Account ID (keyID)</label>
+      <input type="text" id="b2-account" placeholder="0012345abcdef..." />
+    </div>
+    <div class="field">
+      <label>Application Key</label>
+      <input type="password" id="b2-key" placeholder="K0012345..." />
+    </div>
+    <p id="b2-err" style="color:var(--red);font-size:14px;margin-top:4px;display:none"></p>
+    <button class="btn btn-accent btn-full btn-lg" onclick="doB2Connect()" style="margin-top:16px">Save →</button>
+    <button class="btn btn-subtle btn-full" onclick="showScreen('screen-providers')" style="margin-top:8px">← Back</button>
+  </div>
+</div>
+
+<!-- ══ 8. SFTP / FTP ══════════════════════════════════════ -->
+<div id="screen-sftp" class="screen connect-screen">
+  <div class="card">
+    <span class="emoji">🖥</span>
+    <h1>Connect SFTP / FTP Server</h1>
+    <p>Enter your server details. SFTP is recommended — it encrypts your connection.</p>
+    <div class="field" style="margin-top:20px">
+      <label>Connection name</label>
+      <input type="text" id="sftp-name" placeholder="e.g. My Server" />
+    </div>
+    <div class="field">
+      <label>Protocol</label>
+      <select id="sftp-type">
+        <option value="sftp">SFTP (secure, recommended)</option>
+        <option value="ftp">FTP</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Host / IP address</label>
+      <input type="text" id="sftp-host" placeholder="e.g. myserver.com or 192.168.1.10" />
+    </div>
+    <div class="field">
+      <label>Port <span style="color:var(--faint);font-weight:400">(leave blank for default)</span></label>
+      <input type="text" id="sftp-port" placeholder="22 for SFTP · 21 for FTP" />
+    </div>
+    <div class="field">
+      <label>Username</label>
+      <input type="text" id="sftp-user" placeholder="e.g. admin" />
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="sftp-pass" placeholder="Optional if using SSH key" />
+    </div>
+    <p id="sftp-err" style="color:var(--red);font-size:14px;margin-top:4px;display:none"></p>
+    <button class="btn btn-accent btn-full btn-lg" onclick="doSFTPConnect()" style="margin-top:16px">Save →</button>
+    <button class="btn btn-subtle btn-full" onclick="showScreen('screen-providers')" style="margin-top:8px">← Back</button>
+  </div>
+</div>
+
+<!-- ══ 9. S3-COMPATIBLE (Wasabi / Cloudflare R2) ══════════ -->
+<div id="screen-s3compat" class="screen connect-screen">
+  <div class="card">
+    <span class="emoji" id="s3c-emoji">🪣</span>
+    <h1 id="s3c-title">Connect Wasabi</h1>
+    <p id="s3c-desc">Enter your Wasabi credentials. Find these in the Wasabi console under <strong>Access Keys</strong>.</p>
+    <div id="s3c-r2-account" class="field" style="margin-top:20px;display:none">
+      <label>Cloudflare Account ID</label>
+      <input type="text" id="s3c-account-id" placeholder="Found in Cloudflare dashboard → R2" />
+    </div>
+    <div class="field" style="margin-top:20px">
+      <label>Connection name</label>
+      <input type="text" id="s3c-name" placeholder="e.g. My Storage" />
+    </div>
+    <div class="field">
+      <label>Access Key ID</label>
+      <input type="text" id="s3c-key" placeholder="Access key..." />
+    </div>
+    <div class="field">
+      <label>Secret Access Key</label>
+      <input type="password" id="s3c-secret" placeholder="Secret key..." />
+    </div>
+    <div class="field" id="s3c-region-row">
+      <label>Region</label>
+      <input type="text" id="s3c-region" placeholder="e.g. us-east-1" />
+    </div>
+    <p id="s3c-err" style="color:var(--red);font-size:14px;margin-top:4px;display:none"></p>
+    <button class="btn btn-accent btn-full btn-lg" onclick="doS3CompatConnect()" style="margin-top:16px">Save →</button>
+    <button class="btn btn-subtle btn-full" onclick="showScreen('screen-providers')" style="margin-top:8px">← Back</button>
+  </div>
+</div>
+
+<!-- ══ 10. MAIN APP ═══════════════════════════════════════ -->
+<div id="screen-app" class="screen">
+  <div class="app-header">
+    <div class="app-header-brand">
+      <div class="app-header-logo">⇄</div>
+      <h1>rclone GUI</h1>
+    </div>
+    <span class="ver-badge" id="ver-badge"></span>
+    <span class="update-badge" id="update-badge" style="display:none" title="Click to update rclone"></span>
+    <span class="update-badge" id="app-update-badge" style="display:none;background:rgba(90,120,255,0.15);color:#7a9fff;border-color:rgba(90,120,255,0.3)" title="App update available"></span>
+    <div class="header-spacer"></div>
+    <div class="remote-pills" id="remote-pills"></div>
+    <button class="btn btn-ghost" style="padding:6px 14px;font-size:13px;margin-left:8px" onclick="showScreen('screen-providers')">Add Storage</button>
+    <button class="btn btn-ghost" style="padding:6px 14px;font-size:13px;color:var(--muted)" onclick="quitApp()">Quit</button>
+  </div>
+
+  <div class="app-body">
+
+    <!-- FROM / TO -->
+    <div class="transfer-grid">
+
+      <div class="endpoint-card">
+        <h2>From</h2>
+        <div class="ep-field">
+          <span class="ep-label">Storage</span>
+          <div class="ep-row">
+            <div class="remote-picker" id="src-remote-picker">
+              <div class="rp-trigger" id="src-remote-trigger" onclick="toggleRP('src')">
+                <img class="rp-icon" id="src-remote-icon" src="" style="display:none" onerror="this.style.display='none';document.getElementById('src-remote-emoji').style.display=''">
+                <span class="rp-emoji" id="src-remote-emoji">💻</span>
+                <span class="rp-label" id="src-remote-label">This Computer</span>
+                <svg class="rp-chevron" viewBox="0 0 10 7" fill="none"><path d="M1 1l4 4.5L9 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="rp-panel" id="src-remote-panel"></div>
+            </div>
+            <input type="hidden" id="src-remote" value="local">
+          </div>
+        </div>
+        <div class="ep-field">
+          <span class="ep-label">Folder <span style="color:var(--faint)">(optional)</span></span>
+          <div class="ep-row">
+            <input type="text" id="src-path" placeholder="e.g. Documents/Photos">
+            <button class="browse-btn" onclick="openBrowse('src')">Browse</button>
+          </div>
+        </div>
+        <div class="ep-field" id="shared-row" style="display:none">
+          <label class="chk-label" style="font-size:13px">
+            <input type="checkbox" id="shared-with-me">
+            Show files shared with me
+          </label>
+        </div>
+      </div>
+
+      <button class="swap-btn" onclick="swapEndpoints()" title="Swap">⇄</button>
+
+      <div class="endpoint-card">
+        <h2>To</h2>
+        <div class="ep-field">
+          <span class="ep-label">Storage</span>
+          <div class="ep-row">
+            <div class="remote-picker" id="dst-remote-picker">
+              <div class="rp-trigger" id="dst-remote-trigger" onclick="toggleRP('dst')">
+                <img class="rp-icon" id="dst-remote-icon" src="" style="display:none" onerror="this.style.display='none';document.getElementById('dst-remote-emoji').style.display=''">
+                <span class="rp-emoji" id="dst-remote-emoji">💻</span>
+                <span class="rp-label" id="dst-remote-label">This Computer</span>
+                <svg class="rp-chevron" viewBox="0 0 10 7" fill="none"><path d="M1 1l4 4.5L9 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="rp-panel" id="dst-remote-panel"></div>
+            </div>
+            <input type="hidden" id="dst-remote" value="local">
+          </div>
+        </div>
+        <div class="ep-field">
+          <span class="ep-label">Folder <span style="color:var(--faint)">(optional)</span></span>
+          <div class="ep-row">
+            <input type="text" id="dst-path" placeholder="e.g. Backups/Photos">
+            <button class="browse-btn" onclick="openBrowse('dst')">Browse</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Options -->
+    <div class="options-row">
+      <label class="chk-label">
+        <input type="checkbox" id="dry-run">
+        Preview changes without actually copying anything
+      </label>
+    </div>
+
+    <div class="inline-err" id="app-err"></div>
+
+    <!-- Actions -->
+    <div class="actions-row">
+      <button class="btn btn-accent btn-lg" id="copy-btn" onclick="runCopy()">Copy Files</button>
+      <button class="btn btn-ghost btn-lg" id="check-btn" onclick="runCheck()">Verify Files Match</button>
+    </div>
+
+    <!-- Output -->
+    <div class="output-wrap" id="output-wrap">
+      <div class="output-head">
+        <span class="output-title" id="output-title">Output</span>
+        <span class="status-pill pill-run" id="output-pill">Running…</span>
+      </div>
+      <div id="output-log"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ FINDER WAITING OVERLAY ═════════════════════════════ -->
+<div class="modal-bg" id="finder-waiting" style="display:none">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:36px 40px;text-align:center;max-width:340px;box-shadow:var(--shadow2)">
+    <div style="font-size:48px;margin-bottom:16px">🗂️</div>
+    <h3 style="font-size:17px;font-weight:700;margin-bottom:8px">Finder is open</h3>
+    <p style="color:var(--muted);font-size:14px;line-height:1.6;margin-bottom:20px">
+      Choose a folder in the Finder window, then click <strong>Open</strong>.
+    </p>
+    <button class="btn btn-ghost btn-full" onclick="cancelPicker()">Cancel</button>
+  </div>
+</div>
+
+<!-- ══ BROWSE MODAL (cloud remotes only) ══════════════════ -->
+<div class="modal-bg" id="browse-bg" onclick="closeBrowse(event)">
+  <div class="finder-win" onclick="event.stopPropagation()">
+
+    <div class="finder-titlebar">
+      <button class="finder-close" onclick="closeBrowse()">✕</button>
+      <h3>Choose a Folder</h3>
+      <div style="width:28px"></div>
+    </div>
+
+    <div class="finder-crumb" id="browse-crumb"></div>
+    <div class="browse-search-bar" id="browse-search-bar">
+      <input type="text" id="browse-search" placeholder="Filter items…" oninput="filterBrowseRemote()" autocomplete="off">
+    </div>
+
+    <div class="finder-body">
+      <div class="finder-sidebar" id="finder-sidebar" style="display:none"></div>
+      <div class="finder-content" id="browse-list"></div>
+    </div>
+
+    <div class="finder-footer">
+      <span class="finder-footer-path" id="finder-footer-path"></span>
+      <button class="btn btn-ghost" onclick="closeBrowse()">Cancel</button>
+      <button class="btn btn-accent" onclick="confirmBrowse()">Select</button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────
+let allRemotes   = [];
+let remoteTypes  = {};   // { 'gdrive:': 'drive', ... }
+let connectType  = '';
+let connectIcon  = '';
+let connectLabel = '';
+let browseTarget   = '';   // 'src' or 'dst'
+let browseCurPath  = '';   // relative path within remote (cloud) or full path (local)
+let browseRemote   = '';
+let browseFlags    = '';
+let browseIsLocal  = false;
+let localShortcuts = [];   // cached from /api/local-shortcuts
+let appReady     = false;
+
+// ── Screens ───────────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ── Boot ──────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  boot();
+  fetch('/api/local-shortcuts').then(r => r.json()).then(d => { localShortcuts = d.shortcuts || []; });
+});
+
+async function boot() {
+  showScreen('screen-loading');
+  let data;
+  try {
+    const ctrl = new AbortController();
+    setTimeout(() => ctrl.abort(), 12000);
+    const res = await fetch('/api/status', { signal: ctrl.signal });
+    data = await res.json();
+  } catch (e) {
+    // If status check fails, try to install
+    data = { installed: false, remotes: [] };
+  }
+
+  if (!data.installed) {
+    showScreen('screen-installing');
+    startInstall();
+    return;
+  }
+
+  allRemotes = data.remotes || [];
+
+  if (allRemotes.length === 0) {
+    showScreen('screen-providers');
+    return;
+  }
+
+  openApp(data);
+}
+
+// ── Install rclone ────────────────────────────────────────
+async function startInstall() {
+  document.getElementById('install-err').style.display = 'none';
+  document.getElementById('retry-install-btn').style.display = 'none';
+  document.getElementById('install-label').textContent = 'Starting…';
+  document.getElementById('install-bar').style.width = '0%';
+
+  const res  = await fetch('/api/install-rclone', { method: 'POST' });
+  const { job_id } = await res.json();
+  streamJob(job_id, {
+    onProgress(pct) {
+      document.getElementById('install-bar').style.width = pct + '%';
+      document.getElementById('install-label').textContent = pct < 100 ? `Downloading… ${pct}%` : 'Almost done…';
+    },
+    onStatus(txt) {
+      document.getElementById('install-label').textContent = txt;
+    },
+    onDone(success, err) {
+      if (success) {
+        document.getElementById('install-label').textContent = 'All set!';
+        setTimeout(() => { showScreen('screen-providers'); }, 600);
+      } else {
+        document.getElementById('install-err').textContent = 'Download failed: ' + (err || 'unknown error');
+        document.getElementById('install-err').style.display = 'block';
+        document.getElementById('retry-install-btn').style.display = 'block';
+      }
+    }
+  });
+}
+
+// ── Provider connect ──────────────────────────────────────
+const providerIconUrls = {
+  drive:        'https://api.iconify.design/logos:google-drive.svg',
+  dropbox:      'https://api.iconify.design/logos:dropbox.svg',
+  onedrive:     'https://api.iconify.design/logos:microsoft-onedrive.svg',
+  box:          'https://api.iconify.design/logos:box.svg',
+  s3:           'https://api.iconify.design/logos:aws-s3.svg',
+  b2:           'https://api.iconify.design/simple-icons:backblaze.svg',
+  pcloud:       'https://api.iconify.design/simple-icons:pcloud.svg',
+  yandex:       'https://api.iconify.design/simple-icons:yandex.svg',
+  googlephotos: 'https://api.iconify.design/logos:google-photos.svg',
+  mega:         'https://api.iconify.design/simple-icons:mega.svg',
+  jottacloud:   null,
+  sftp:         null,
+  ftp:          null,
+};
+
+function showConnect(type, label, icon) {
+  connectType  = type;
+  connectLabel = label;
+  connectIcon  = icon;
+  const img = document.getElementById('connect-icon-img');
+  img.src = providerIconUrls[type] || '';
+  img.style.display = providerIconUrls[type] ? '' : 'none';
+  document.getElementById('connect-title').textContent = 'Connect ' + label;
+  document.getElementById('connect-name').value = 'My ' + label;
+  document.getElementById('connect-err').style.display = 'none';
+  document.getElementById('browser-wait').classList.remove('show');
+  document.getElementById('connect-go-btn').disabled = false;
+  document.getElementById('connect-go-btn').innerHTML = 'Connect →';
+  showScreen('screen-connect');
+}
+
+function showS3Connect() {
+  document.getElementById('s3-err').style.display = 'none';
+  showScreen('screen-s3');
+}
+
+async function doConnect() {
+  const name = document.getElementById('connect-name').value.trim();
+  if (!name) { shakeInput('connect-name'); return; }
+
+  document.getElementById('connect-go-btn').disabled = true;
+  document.getElementById('connect-go-btn').innerHTML = '<span class="spin"></span> Opening browser…';
+  document.getElementById('connect-err').style.display = 'none';
+  document.getElementById('browser-wait').classList.add('show');
+
+  const extra = connectType === 'drive' ? { scope: 'drive' } : {};
+
+  const res    = await fetch('/api/authorize-remote', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, type: connectType, extra })
+  });
+  const { job_id } = await res.json();
+
+  streamJob(job_id, {
+    onDone(success, err) {
+      document.getElementById('browser-wait').classList.remove('show');
+      if (success) {
+        document.getElementById('connected-title').textContent = connectLabel + ' connected!';
+        document.getElementById('connected-msg').textContent = '"' + name + '" is ready to use.';
+        allRemotes.push(name + ':');
+        showScreen('screen-connected');
+      } else {
+        document.getElementById('connect-err').textContent = err || 'Sign-in failed. Please try again.';
+        document.getElementById('connect-err').style.display = 'block';
+        document.getElementById('connect-go-btn').disabled = false;
+        document.getElementById('connect-go-btn').innerHTML = 'Try again →';
+      }
+    }
+  });
+}
+
+async function doS3Connect() {
+  const name   = document.getElementById('s3-name').value.trim();
+  const key    = document.getElementById('s3-key').value.trim();
+  const secret = document.getElementById('s3-secret').value.trim();
+  const region = document.getElementById('s3-region').value;
+  const errEl  = document.getElementById('s3-err');
+
+  if (!name || !key || !secret) {
+    errEl.textContent = 'Please fill in all fields.';
+    errEl.style.display = 'block'; return;
+  }
+
+  const res = await fetch('/api/create-keyed-remote', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, params: { type: 's3', provider: 'AWS', access_key_id: key, secret_access_key: secret, region } })
+  });
+  const { job_id } = await res.json();
+
+  streamJob(job_id, {
+    onDone(success, err) {
+      if (success) {
+        document.getElementById('connected-title').textContent = 'S3 connected!';
+        document.getElementById('connected-msg').textContent = '"' + name + '" is ready to use.';
+        allRemotes.push(name + ':');
+        showScreen('screen-connected');
+      } else {
+        errEl.textContent = err || 'Failed to save. Please try again.';
+        errEl.style.display = 'block';
+      }
+    }
+  });
+}
+
+function skipToApp() {
+  showScreen('screen-loading');
+  fetch('/api/status').then(r => r.json()).then(d => openApp(d));
+}
+
+function finishConnect() {
+  fetch('/api/status').then(r => r.json()).then(d => openApp(d));
+}
+
+// ── Main app ──────────────────────────────────────────────
+function openApp(data) {
+  allRemotes  = data.remotes || [];
+  remoteTypes = data.types  || {};
+  if (data.version) document.getElementById('ver-badge').textContent = data.version;
+  if (data.app_version) document.getElementById('ver-badge').textContent += '  ·  app v' + data.app_version;
+
+  checkForUpdate();       // rclone version check
+  checkForAppUpdate();    // app version check — async, silent if up to date
+
+  // Pills
+  const pills = document.getElementById('remote-pills');
+  pills.innerHTML = '';
+  allRemotes.forEach(r => {
+    const span = document.createElement('span');
+    span.className = 'remote-pill';
+    span.textContent = r.replace(/:$/, '');
+    pills.appendChild(span);
+  });
+
+  buildRemoteDropdowns();
+  showScreen('screen-app');
+}
+
+// ── Remote picker helpers ─────────────────────────────────
+function rpIconFor(value) {
+  // value is 'local' or a remote like 'gdrive:' — look up by remote type
+  if (value === 'local') return { img: null, emoji: '💻' };
+  const type = remoteTypes[value] || '';
+  const url  = providerIconUrls[type] || null;
+  const fallback = type === 'sftp' || type === 'ftp' ? '🖥' :
+                   type === 'jottacloud' ? '🇳🇴' : '☁️';
+  return { img: url, emoji: fallback };
+}
+
+function rpLabelFor(value) {
+  return value === 'local' ? 'This Computer' : value.replace(/:$/, '');
+}
+
+function setRPValue(side, value) {
+  document.getElementById(side + '-remote').value = value;
+  const { img, emoji } = rpIconFor(value);
+  const iconEl  = document.getElementById(side + '-remote-icon');
+  const emojiEl = document.getElementById(side + '-remote-emoji');
+  const labelEl = document.getElementById(side + '-remote-label');
+
+  // reset both first so onerror fallback doesn't fight us
+  iconEl.onerror = () => {
+    iconEl.style.display = 'none';
+    emojiEl.style.display = '';
+  };
+  if (img) {
+    iconEl.src = img;
+    iconEl.style.display = '';
+    emojiEl.style.display = 'none';
+  } else {
+    iconEl.src = '';
+    iconEl.style.display = 'none';
+    emojiEl.style.display = '';
+    emojiEl.textContent = emoji;
+  }
+  labelEl.textContent = rpLabelFor(value);
+
+  // rebuild panel active states
+  const panel = document.getElementById(side + '-remote-panel');
+  panel.querySelectorAll('.rp-option').forEach(o => {
+    o.classList.toggle('active', o.dataset.value === value);
+  });
+}
+
+function buildRPPanel(side, options) {
+  const panel = document.getElementById(side + '-remote-panel');
+  panel.innerHTML = '';
+  options.forEach(({ value, label }) => {
+    const { img, emoji } = rpIconFor(value);
+    const row = document.createElement('div');
+    row.className = 'rp-option';
+    row.dataset.value = value;
+    if (img) {
+      row.innerHTML = `<img class="rp-opt-icon" src="${img}" onerror="this.style.display='none';this.nextElementSibling.style.display=''">
+                       <span class="rp-opt-emoji" style="display:none">${emoji}</span>
+                       <span class="rp-opt-label">${label}</span>`;
+    } else {
+      row.innerHTML = `<span class="rp-opt-emoji">${emoji}</span>
+                       <span class="rp-opt-label">${label}</span>`;
+    }
+    row.onclick = () => { selectRP(side, value); };
+    panel.appendChild(row);
+  });
+}
+
+function toggleRP(side) {
+  const trigger = document.getElementById(side + '-remote-trigger');
+  const panel   = document.getElementById(side + '-remote-panel');
+  const isOpen  = panel.classList.contains('open');
+  // close all pickers first
+  document.querySelectorAll('.rp-panel').forEach(p => p.classList.remove('open'));
+  document.querySelectorAll('.rp-trigger').forEach(t => t.classList.remove('open'));
+  if (!isOpen) {
+    panel.classList.add('open');
+    trigger.classList.add('open');
+  }
+}
+
+function selectRP(side, value) {
+  setRPValue(side, value);
+  document.getElementById(side + '-remote-panel').classList.remove('open');
+  document.getElementById(side + '-remote-trigger').classList.remove('open');
+  if (side === 'src') onSrcRemoteChange();
+  else               onDstRemoteChange();
+}
+
+// Close pickers when clicking outside
+document.addEventListener('click', e => {
+  if (!e.target.closest('.remote-picker')) {
+    document.querySelectorAll('.rp-panel').forEach(p => p.classList.remove('open'));
+    document.querySelectorAll('.rp-trigger').forEach(t => t.classList.remove('open'));
+  }
+});
+
+function buildRemoteDropdowns() {
+  const options = [
+    { value: 'local', label: 'This Computer' },
+    ...allRemotes.map(r => ({ value: r, label: r.replace(/:$/, '') }))
+  ];
+
+  ['src', 'dst'].forEach((side, idx) => {
+    const prevValue = document.getElementById(side + '-remote').value;
+    buildRPPanel(side, options);
+
+    let newValue = prevValue;
+    if (!options.some(o => o.value === prevValue)) {
+      newValue = idx === 1 && allRemotes.length > 0 ? allRemotes[0] : 'local';
+    }
+    setRPValue(side, newValue);
+  });
+}
+
+async function refreshRemotes() {
+  const r = await fetch('/api/remotes');
+  const d = await r.json();
+  allRemotes = d.remotes || [];
+  buildRemoteDropdowns();
+}
+
+function onSrcRemoteChange() {
+  document.getElementById('src-path').value = '';
+  const remote   = document.getElementById('src-remote').value;
+  const isDrive  = remoteTypes[remote] === 'drive';
+  document.getElementById('shared-row').style.display = isDrive ? '' : 'none';
+  if (!isDrive) document.getElementById('shared-with-me').checked = false;
+}
+function onDstRemoteChange() { document.getElementById('dst-path').value = ''; }
+
+// ── Build rclone path ─────────────────────────────────────
+function buildPath(remote, pathVal) {
+  const p = pathVal.trim();
+  if (remote === 'local') return p || '/';
+  return p ? remote + p : remote;
+}
+
+// ── Swap ──────────────────────────────────────────────────
+function swapEndpoints() {
+  const srcVal = document.getElementById('src-remote').value;
+  const dstVal = document.getElementById('dst-remote').value;
+  const sp = document.getElementById('src-path');
+  const dp = document.getElementById('dst-path');
+  setRPValue('src', dstVal);
+  setRPValue('dst', srcVal);
+  [sp.value, dp.value] = [dp.value, sp.value];
+  onSrcRemoteChange();
+}
+
+
+// ── Copy / Verify ─────────────────────────────────────────
+function getExtraFlags() {
+  const flags = [];
+  if (document.getElementById('shared-with-me').checked) flags.push('--drive-shared-with-me');
+  return flags;
+}
+
+async function runCopy() {
+  const src   = buildPath(document.getElementById('src-remote').value, document.getElementById('src-path').value);
+  const dst   = buildPath(document.getElementById('dst-remote').value, document.getElementById('dst-path').value);
+  const dry   = document.getElementById('dry-run').checked;
+  const flags = getExtraFlags();
+  const label = dry ? 'Preview (Dry Run)' : 'Copying Files…';
+  await startTransfer('/api/copy', { source: src, dest: dst, dry_run: dry, flags }, label);
+}
+
+async function runCheck() {
+  const src   = buildPath(document.getElementById('src-remote').value, document.getElementById('src-path').value);
+  const dst   = buildPath(document.getElementById('dst-remote').value, document.getElementById('dst-path').value);
+  const flags = getExtraFlags();
+  await startTransfer('/api/check', { source: src, dest: dst, flags }, 'Verifying Files Match…');
+}
+
+async function startTransfer(endpoint, payload, label) {
+  document.getElementById('app-err').classList.remove('show');
+  setBusy(true);
+
+  const wrap  = document.getElementById('output-wrap');
+  const log   = document.getElementById('output-log');
+  const title = document.getElementById('output-title');
+  const pill  = document.getElementById('output-pill');
+
+  wrap.classList.add('show');
+  log.innerHTML = '';
+  title.textContent = label;
+  pill.className = 'status-pill pill-run';
+  pill.textContent = 'Running…';
+
+  addLog('l-dim', '▶ ' + endpoint.replace('/api/','') + '  "' + payload.source + '"  →  "' + payload.dest + '"' + (payload.dry_run ? '  [dry run]' : ''));
+
+  let res;
+  try {
+    res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  } catch (e) {
+    showAppErr('Connection error: ' + e.message);
+    setBusy(false);
+    return;
+  }
+
+  if (!res.ok) {
+    const d = await res.json();
+    showAppErr(d.error || 'Something went wrong. Please try again.');
+    setBusy(false);
+    return;
+  }
+
+  const { job_id } = await res.json();
+  streamJob(job_id, {
+    onLine(text) {
+      let cls = 'l-info';
+      if (/ERROR|error|FAILED|failed/.test(text)) cls = 'l-err';
+      else if (/WARNING|warning/.test(text))       cls = 'l-warn';
+      else if (/Copied|Transferred.*100%|identical|0 differences|Match/.test(text)) cls = 'l-ok';
+      else if (/^(Transferred|Elapsed|Checks|Errors):/.test(text)) cls = 'l-dim';
+      addLog(cls, text);
+    },
+    onDone(success) {
+      setBusy(false);
+      if (success) {
+        pill.className = 'status-pill pill-ok';
+        pill.textContent = 'Done ✓';
+        addLog('l-ok', '\n✓  Completed successfully.');
+      } else {
+        pill.className = 'status-pill pill-err';
+        pill.textContent = 'Errors';
+        addLog('l-err', '\n✗  Finished with errors — check the output above.');
+      }
+    }
+  });
+}
+
+function addLog(cls, text) {
+  const el   = document.getElementById('output-log');
+  const span = document.createElement('span');
+  span.className = cls;
+  span.textContent = text + '\n';
+  el.appendChild(span);
+  el.scrollTop = el.scrollHeight;
+}
+
+function showAppErr(msg) {
+  const el = document.getElementById('app-err');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+
+function setBusy(busy) {
+  const copy  = document.getElementById('copy-btn');
+  const check = document.getElementById('check-btn');
+  copy.disabled = check.disabled = busy;
+  copy.innerHTML  = busy ? '<span class="spin"></span>&nbsp; Running…' : 'Copy Files';
+  check.innerHTML = busy ? '…' : 'Verify Files Match';
+}
+
+// ── Browse modal ──────────────────────────────────────────
+let pickerAborted = false;
+
+function openBrowse(side) {
+  browseTarget  = side;
+  browseRemote  = document.getElementById(side + '-remote').value;
+  browseIsLocal = (browseRemote === 'local');
+
+  if (browseIsLocal) {
+    pickLocalFolder(side);
+    return;
+  }
+
+  browseCurPath = document.getElementById(side + '-path').value.trim();
+  browseFlags   = (side === 'src' && document.getElementById('shared-with-me').checked)
+                  ? '--drive-shared-with-me' : '';
+  document.getElementById('browse-bg').classList.add('show');
+  loadBrowse();
+}
+
+async function pickLocalFolder(side) {
+  pickerAborted = false;
+  document.getElementById('finder-waiting').style.display = 'flex';
+
+  try {
+    const res  = await fetch('/api/pick-folder');
+    const data = await res.json();
+    document.getElementById('finder-waiting').style.display = 'none';
+    if (!pickerAborted && data.path) {
+      document.getElementById(side + '-path').value = data.path;
+    }
+  } catch (e) {
+    document.getElementById('finder-waiting').style.display = 'none';
+  }
+}
+
+function cancelPicker() {
+  pickerAborted = true;
+  document.getElementById('finder-waiting').style.display = 'none';
+  // Can't cancel the osascript dialog remotely, but we hide the overlay
+  // and discard the result when it eventually returns
+}
+
+function closeBrowse(e) {
+  if (e && e.target !== document.getElementById('browse-bg')) return;
+  document.getElementById('browse-bg').classList.remove('show');
+}
+
+async function loadBrowse() {
+  const list  = document.getElementById('browse-list');
+  const crumb = document.getElementById('browse-crumb');
+
+  if (browseIsLocal) {
+    // Local: icon grid, no search bar
+    list.classList.remove('list-mode');
+    document.getElementById('browse-search-bar').classList.remove('show');
+    list.innerHTML = '<div class="finder-empty"><span class="spin spin-accent"></span>&nbsp; Loading…</div>';
+    await loadBrowseLocal(list, crumb);
+  } else {
+    await loadBrowseRemote(list, crumb);
+  }
+}
+
+// ── Folder SVG (macOS-style blue) ────────────────────────
+function folderSVG(size=44) {
+  return `<svg width="${size}" height="${Math.round(size*0.82)}" viewBox="0 0 56 46" fill="none">
+    <path d="M0 8a4 4 0 014-4h16l5 6h27a4 4 0 014 4v28a4 4 0 01-4 4H4a4 4 0 01-4-4V8z" fill="#5DB8F5"/>
+    <path d="M0 16h56v22a4 4 0 01-4 4H4a4 4 0 01-4-4V16z" fill="#4AAEE8"/>
+    <path d="M0 16h56v5H0z" fill="rgba(255,255,255,0.15)"/>
+  </svg>`;
+}
+
+// ── Breadcrumb builder ────────────────────────────────────
+function renderCrumb(path) {
+  const crumb = document.getElementById('browse-crumb');
+  crumb.innerHTML = '';
+  if (!path) return;
+  const home = localShortcuts.find(s => s.name === 'Home')?.path;
+  let segments, paths;
+  if (browseIsLocal) {
+    const parts = path.split('/').filter(Boolean);
+    segments = parts.map((p, i) => {
+      const fullP = '/' + parts.slice(0, i+1).join('/');
+      const label = (home && fullP === home) ? '🏠 Home' : p;
+      return { label, path: fullP };
+    });
+  } else {
+    const parts = (browseCurPath || '').replace(/\/$/, '').split('/').filter(Boolean);
+    segments = [{ label: browseRemote.replace(/:$/, ''), path: '' },
+      ...parts.map((p, i) => ({ label: p, path: parts.slice(0, i+1).join('/') + '/' }))];
+  }
+  segments.forEach((seg, i) => {
+    if (i > 0) { const s = document.createElement('span'); s.className = 'crumb-sep'; s.textContent = '›'; crumb.appendChild(s); }
+    const el = document.createElement('span');
+    el.className = 'crumb-seg' + (i === segments.length - 1 ? ' last' : '');
+    el.textContent = seg.label;
+    if (i < segments.length - 1) {
+      el.onclick = () => { browseCurPath = seg.path; loadBrowse(); };
+    }
+    crumb.appendChild(el);
+  });
+}
+
+// ── Populate sidebar ──────────────────────────────────────
+function renderSidebar(currentPath) {
+  const sidebar = document.getElementById('finder-sidebar');
+  const icons = { Home: '🏠', Desktop: '🖥', Documents: '📄', Downloads: '⬇️' };
+  sidebar.innerHTML = '<div class="sidebar-section">Favourites</div>';
+  localShortcuts.forEach(s => {
+    const btn = document.createElement('button');
+    btn.className = 'sidebar-item' + (currentPath === s.path ? ' current' : '');
+    btn.innerHTML = `<span>${icons[s.name] || '📁'}</span>${s.name}`;
+    btn.onclick = () => { browseCurPath = s.path; loadBrowse(); };
+    sidebar.appendChild(btn);
+  });
+}
+
+async function loadBrowseLocal(list, crumb) {
+  const url  = '/api/browse-local' + (browseCurPath ? '?path=' + encodeURIComponent(browseCurPath) : '');
+  const data = await fetch(url).then(r => r.json());
+  browseCurPath = data.current || browseCurPath;
+
+  document.getElementById('finder-sidebar').style.display = '';
+  document.getElementById('finder-footer-path').textContent = data.current || '';
+  renderSidebar(data.current);
+  renderCrumb(data.current);
+  list.innerHTML = '';
+
+  if (data.error) {
+    list.innerHTML = `<div class="finder-err" style="grid-column:1/-1">${data.error}</div>`;
+    return;
+  }
+  if (!data.items.length) {
+    list.innerHTML = '<div class="finder-empty" style="grid-column:1/-1">No folders here.</div>';
+    return;
+  }
+
+  data.items.forEach(item => {
+    const tile = document.createElement('div');
+    tile.className = 'folder-tile';
+    tile.innerHTML = folderSVG(44) + `<div class="tile-name">${item.name}</div>`;
+    tile.onclick = () => { browseCurPath = item.path; loadBrowse(); };
+    list.appendChild(tile);
+  });
+}
+
+let browseAllItems = [];  // cached for search filter
+
+async function loadBrowseRemote(list, crumb) {
+  const full = browseRemote + (browseCurPath || '');
+  document.getElementById('finder-sidebar').style.display = 'none';
+  document.getElementById('finder-footer-path').textContent = full;
+  renderCrumb(full);
+
+  // Show search bar & switch to list mode
+  const searchBar = document.getElementById('browse-search-bar');
+  searchBar.classList.add('show');
+  document.getElementById('browse-search').value = '';
+  list.classList.add('list-mode');
+
+  list.innerHTML = '<div class="finder-empty" style="padding:40px;width:100%"><span class="spin spin-accent"></span>&nbsp; Loading…</div>';
+
+  let url = '/api/browse?path=' + encodeURIComponent(full);
+  if (browseFlags) url += '&flags=' + encodeURIComponent(browseFlags);
+
+  const data = await fetch(url).then(r => r.json());
+  browseAllItems = data.items || [];
+  renderRemoteList(list, browseAllItems, data.error);
+}
+
+function renderRemoteList(list, items, error) {
+  list.innerHTML = '';
+  if (error && !items.length) {
+    list.innerHTML = `<div class="finder-err" style="width:100%">${error}</div>`;
+    return;
+  }
+  if (!items.length) {
+    const q = document.getElementById('browse-search').value.trim();
+    list.innerHTML = `<div class="finder-empty" style="width:100%">${q ? 'No matches for "' + q + '".' : 'Nothing here yet.'}</div>`;
+    return;
+  }
+
+  const dirs  = items.filter(i => i.kind === 'dir');
+  const files = items.filter(i => i.kind === 'file');
+
+  dirs.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'list-row';
+    row.innerHTML = folderSVG(20) + `<span class="list-row-name">${item.name}</span>`;
+    row.onclick = () => {
+      browseCurPath = (browseCurPath || '') + item.name + '/';
+      loadBrowse();
+    };
+    list.appendChild(row);
+  });
+
+  if (files.length) {
+    const hdr = document.createElement('div');
+    hdr.className = 'list-section-hdr';
+    hdr.textContent = 'Files';
+    list.appendChild(hdr);
+    files.forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'list-row list-file';
+      row.innerHTML = `<span style="font-size:16px;flex-shrink:0">📄</span><span class="list-row-name">${item.name}</span>`;
+      list.appendChild(row);
+    });
+  }
+}
+
+function filterBrowseRemote() {
+  const q = document.getElementById('browse-search').value.toLowerCase().trim();
+  const filtered = q
+    ? browseAllItems.filter(i => i.name.toLowerCase().includes(q))
+    : browseAllItems;
+  renderRemoteList(document.getElementById('browse-list'), filtered, null);
+}
+
+function confirmBrowse() {
+  if (browseTarget) {
+    // Local: browseCurPath is the full absolute path already
+    // Remote: browseCurPath is relative — remote dropdown holds the prefix
+    document.getElementById(browseTarget + '-path').value = browseCurPath;
+  }
+  document.getElementById('browse-bg').classList.remove('show');
+}
+
+// ── SSE stream helper ─────────────────────────────────────
+function streamJob(job_id, cbs) {
+  const es = new EventSource('/api/stream/' + job_id);
+  es.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'heartbeat') return;
+    if (msg.type === 'progress' && cbs.onProgress) cbs.onProgress(msg.pct);
+    if (msg.type === 'status'   && cbs.onStatus)   cbs.onStatus(msg.text);
+    if (msg.type === 'line'     && cbs.onLine)      cbs.onLine(msg.text);
+    if (msg.type === 'browser_opening' && cbs.onBrowser) cbs.onBrowser();
+    if (msg.type === 'done') {
+      es.close();
+      if (cbs.onDone) cbs.onDone(msg.success, msg.error);
+    }
+  };
+  es.onerror = () => { es.close(); if (cbs.onDone) cbs.onDone(false, 'Connection lost.'); };
+}
+
+// ── Quit ──────────────────────────────────────────────────
+async function quitApp() {
+  if (!confirm('Stop rclone GUI?')) return;
+  await fetch('/api/quit', { method: 'POST' });
+  document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:-apple-system,sans-serif;color:#6C6C70;font-size:17px">rclone GUI has stopped. You can close this tab.</div>';
+}
+
+// ── Misc ──────────────────────────────────────────────────
+function shakeInput(id) {
+  const el = document.getElementById(id);
+  el.style.borderColor = 'var(--red)';
+  el.focus();
+  setTimeout(() => el.style.borderColor = '', 1500);
+}
+
+// ── More providers toggle ─────────────────────────────────
+function toggleMoreProviders() {
+  const panel = document.getElementById('more-panel');
+  const btn   = document.getElementById('more-toggle');
+  const open  = panel.classList.toggle('open');
+  btn.textContent = open ? 'Fewer options ▴' : 'More storage options ▾';
+}
+
+// ── Backblaze B2 ──────────────────────────────────────────
+function showB2Connect() {
+  document.getElementById('b2-err').style.display = 'none';
+  document.getElementById('b2-name').value = 'My Backblaze B2';
+  document.getElementById('b2-account').value = '';
+  document.getElementById('b2-key').value = '';
+  showScreen('screen-b2');
+}
+
+async function doB2Connect() {
+  const name    = document.getElementById('b2-name').value.trim();
+  const account = document.getElementById('b2-account').value.trim();
+  const key     = document.getElementById('b2-key').value.trim();
+  const errEl   = document.getElementById('b2-err');
+  if (!name || !account || !key) {
+    errEl.textContent = 'Please fill in all fields.'; errEl.style.display = 'block'; return;
+  }
+  const res = await fetch('/api/create-keyed-remote', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, params: { type: 'b2', account, key } })
+  });
+  const { job_id } = await res.json();
+  streamJob(job_id, {
+    onDone(success, err) {
+      if (success) {
+        document.getElementById('connected-title').textContent = 'Backblaze B2 connected!';
+        document.getElementById('connected-msg').textContent = '"' + name + '" is ready to use.';
+        allRemotes.push(name + ':');
+        showScreen('screen-connected');
+      } else {
+        errEl.textContent = err || 'Failed to save.'; errEl.style.display = 'block';
+      }
+    }
+  });
+}
+
+// ── SFTP / FTP ────────────────────────────────────────────
+function showSFTPConnect() {
+  document.getElementById('sftp-err').style.display = 'none';
+  document.getElementById('sftp-name').value = 'My Server';
+  document.getElementById('sftp-host').value = '';
+  document.getElementById('sftp-user').value = '';
+  document.getElementById('sftp-pass').value = '';
+  document.getElementById('sftp-port').value = '';
+  showScreen('screen-sftp');
+}
+
+async function doSFTPConnect() {
+  const name  = document.getElementById('sftp-name').value.trim();
+  const type  = document.getElementById('sftp-type').value;
+  const host  = document.getElementById('sftp-host').value.trim();
+  const user  = document.getElementById('sftp-user').value.trim();
+  const pass  = document.getElementById('sftp-pass').value;
+  const port  = document.getElementById('sftp-port').value.trim() || (type === 'sftp' ? '22' : '21');
+  const errEl = document.getElementById('sftp-err');
+  if (!name || !host || !user) {
+    errEl.textContent = 'Please fill in connection name, host, and username.';
+    errEl.style.display = 'block'; return;
+  }
+  const params = { type, host, user, port };
+  const res = await fetch('/api/create-server-remote', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, params, password: pass })
+  });
+  const { job_id } = await res.json();
+  streamJob(job_id, {
+    onDone(success, err) {
+      if (success) {
+        document.getElementById('connected-title').textContent = (type === 'sftp' ? 'SFTP' : 'FTP') + ' server connected!';
+        document.getElementById('connected-msg').textContent = '"' + name + '" is ready to use.';
+        allRemotes.push(name + ':');
+        showScreen('screen-connected');
+      } else {
+        errEl.textContent = err || 'Failed to save.'; errEl.style.display = 'block';
+      }
+    }
+  });
+}
+
+// ── S3-compatible (Wasabi / Cloudflare R2) ────────────────
+let s3CompatProvider = 'wasabi';
+function showS3Compat(provider) {
+  s3CompatProvider = provider;
+  const isR2 = provider === 'cloudflare';
+  document.getElementById('s3c-err').style.display = 'none';
+  document.getElementById('s3c-name').value  = isR2 ? 'My Cloudflare R2' : 'My Wasabi';
+  document.getElementById('s3c-key').value    = '';
+  document.getElementById('s3c-secret').value = '';
+  document.getElementById('s3c-region').value = isR2 ? 'auto' : 'us-east-1';
+  document.getElementById('s3c-account-id').value = '';
+  document.getElementById('s3c-emoji').textContent = isR2 ? '🌤' : '🪣';
+  document.getElementById('s3c-title').textContent = isR2 ? 'Connect Cloudflare R2' : 'Connect Wasabi';
+  document.getElementById('s3c-desc').textContent  = isR2
+    ? 'Enter your R2 credentials. Find these in the Cloudflare dashboard under R2 → Manage R2 API Tokens.'
+    : 'Enter your Wasabi credentials from the Wasabi console under Access Keys.';
+  document.getElementById('s3c-r2-account').style.display = isR2 ? '' : 'none';
+  document.getElementById('s3c-region-row').style.display = isR2 ? 'none' : '';
+  showScreen('screen-s3compat');
+}
+
+async function doS3CompatConnect() {
+  const isR2      = s3CompatProvider === 'cloudflare';
+  const name      = document.getElementById('s3c-name').value.trim();
+  const key       = document.getElementById('s3c-key').value.trim();
+  const secret    = document.getElementById('s3c-secret').value.trim();
+  const region    = document.getElementById('s3c-region').value.trim();
+  const accountId = document.getElementById('s3c-account-id').value.trim();
+  const errEl     = document.getElementById('s3c-err');
+
+  if (!name || !key || !secret) {
+    errEl.textContent = 'Please fill in all fields.'; errEl.style.display = 'block'; return;
+  }
+  if (isR2 && !accountId) {
+    errEl.textContent = 'Please enter your Cloudflare Account ID.'; errEl.style.display = 'block'; return;
+  }
+
+  let params;
+  if (isR2) {
+    params = { type: 's3', provider: 'Cloudflare', access_key_id: key, secret_access_key: secret,
+               endpoint: `https://${accountId}.r2.cloudflarestorage.com` };
+  } else {
+    params = { type: 's3', provider: 'Wasabi', access_key_id: key, secret_access_key: secret,
+               region, endpoint: `s3.${region}.wasabisys.com` };
+  }
+
+  const res = await fetch('/api/create-keyed-remote', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, params })
+  });
+  const { job_id } = await res.json();
+  streamJob(job_id, {
+    onDone(success, err) {
+      if (success) {
+        document.getElementById('connected-title').textContent = (isR2 ? 'Cloudflare R2' : 'Wasabi') + ' connected!';
+        document.getElementById('connected-msg').textContent = '"' + name + '" is ready to use.';
+        allRemotes.push(name + ':');
+        showScreen('screen-connected');
+      } else {
+        errEl.textContent = err || 'Failed to save.'; errEl.style.display = 'block';
+      }
+    }
+  });
+}
+
+// ── Version check / update ────────────────────────────────
+async function checkForUpdate() {
+  try {
+    const d = await fetch('/api/check-update').then(r => r.json());
+    if (!d.update_available) return;
+    const badge = document.getElementById('update-badge');
+    badge.textContent = '↑ v' + d.latest + ' available';
+    badge.style.display = '';
+    badge.onclick = () => confirmUpdate(d.latest);
+  } catch(e) {}
+}
+
+function confirmUpdate(version) {
+  if (!confirm(`Update rclone to v${version}?\n\nThis will re-download the rclone binary. It only takes a moment.`)) return;
+  doUpdateRclone(version);
+}
+
+async function checkForAppUpdate() {
+  try {
+    const d = await fetch('/api/check-app-update').then(r => r.json());
+    if (!d.update_available) return;
+    const badge = document.getElementById('app-update-badge');
+    badge.textContent = '↑ App v' + d.latest + ' available';
+    badge.style.display = '';
+    badge.onclick = () => {
+      if (confirm('rclone GUI v' + d.latest + ' is available!\n\nClick OK to open the download page.')) {
+        window.open(d.download_url || 'https://github.com/wcalebparker/rclone-gui/releases/latest', '_blank');
+      }
+    };
+  } catch(e) {}
+}
+
+async function doUpdateRclone(version) {
+  const badge = document.getElementById('update-badge');
+  badge.textContent = '↓ Downloading…';
+  badge.style.cursor = 'default';
+  badge.onclick = null;
+
+  const res = await fetch('/api/update-rclone', { method: 'POST' });
+  const { job_id } = await res.json();
+  streamJob(job_id, {
+    onDone(success) {
+      if (success) {
+        badge.textContent = '✓ Updated';
+        badge.style.background = 'rgba(45,158,82,0.13)';
+        badge.style.color = 'var(--green)';
+        badge.style.borderColor = 'rgba(45,158,82,0.3)';
+        badge.style.cursor = 'default';
+        // refresh version badge
+        fetch('/api/status').then(r => r.json()).then(d => {
+          if (d.version) document.getElementById('ver-badge').textContent = d.version;
+        });
+      } else {
+        badge.textContent = '⚠ Update failed';
+        badge.style.color = 'var(--red)';
+      }
+    }
+  });
+}
+</script>
+</body>
+</html>

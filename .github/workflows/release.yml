@@ -1,0 +1,91 @@
+name: Build & Release
+
+# Triggers when you push a tag like v1.0.0
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-macos:
+    name: Build macOS DMG
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          pip install flask pyinstaller
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Update version in app.py
+        run: |
+          sed -i '' "s/APP_VERSION = \".*\"/APP_VERSION = \"${{ steps.version.outputs.VERSION }}\"/" app.py
+
+      - name: Build with PyInstaller
+        run: pyinstaller rclone-gui.spec --noconfirm
+
+      - name: Patch app launcher
+        run: |
+          APP_PATH="dist/rclone GUI.app"
+          cat > /tmp/launcher.applescript << 'EOF'
+          on run
+              set appDir to do shell script "dirname " & quoted form of (POSIX path of (path to me))
+              set serverBin to appDir & "/rclone-gui-server"
+              do shell script "nohup " & quoted form of serverBin & " > /tmp/rclone-gui.log 2>&1 &"
+              repeat 30 times
+                  try
+                      do shell script "curl -s http://localhost:5001 > /dev/null"
+                      exit repeat
+                  end try
+                  delay 0.5
+              end repeat
+              open location "http://localhost:5001"
+          end run
+          EOF
+          osacompile -o "$APP_PATH" /tmp/launcher.applescript 2>/dev/null || true
+
+      - name: Create DMG
+        run: |
+          mkdir -p dist/dmg_staging
+          cp -R "dist/rclone GUI.app" dist/dmg_staging/
+          create-dmg \
+            --volname "rclone GUI" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "rclone GUI.app" 175 190 \
+            --hide-extension "rclone GUI.app" \
+            --app-drop-link 425 190 \
+            --no-internet-enable \
+            "dist/rclone-GUI-v${{ steps.version.outputs.VERSION }}.dmg" \
+            "dist/dmg_staging/" || \
+          hdiutil create \
+            -volname "rclone GUI" \
+            -srcfolder "dist/dmg_staging" \
+            -ov -format UDZO \
+            "dist/rclone-GUI-v${{ steps.version.outputs.VERSION }}.dmg"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "rclone GUI v${{ steps.version.outputs.VERSION }}"
+          body_path: CHANGELOG.md
+          files: "dist/rclone-GUI-v${{ steps.version.outputs.VERSION }}.dmg"
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
