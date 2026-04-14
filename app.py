@@ -33,7 +33,7 @@ app = Flask(__name__,
             static_folder=os.path.join(BUNDLE_DIR, 'static'))
 ANSI = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 active_jobs = {}
-APP_VERSION = "1.0.10"
+APP_VERSION = "1.0.11"
 
 def https_get(url, timeout=15):
     """Perform a simple HTTPS GET and return the response object."""
@@ -209,6 +209,19 @@ def _authorize_remote(jid, name, rtype, extra):
     rc = find_rclone()
     try:
         q.put({'type': 'browser_opening'})
+
+        # Snapshot existing config sections so we can remove any extras that
+        # rclone authorize auto-creates (e.g. a section named "dropbox" or
+        # "drive") — those would show up as duplicate remotes alongside the
+        # user's chosen name.
+        cfg_path = rclone_conf_path()
+        sections_before = set()
+        if os.path.exists(cfg_path):
+            _pre = configparser.RawConfigParser()
+            _pre.optionxform = str
+            _pre.read(cfg_path)
+            sections_before = set(_pre.sections())
+
         cmd = [rc, 'authorize', rtype]
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 stdin=subprocess.DEVNULL, text=True)
@@ -220,6 +233,19 @@ def _authorize_remote(jid, name, rtype, extra):
             lines.append(line)
             q.put({'type': 'line', 'text': line})
         proc.wait()
+
+        # Remove any sections rclone auto-created during authorization
+        if os.path.exists(cfg_path):
+            _post = configparser.RawConfigParser()
+            _post.optionxform = str
+            _post.read(cfg_path)
+            auto_created = [s for s in _post.sections()
+                            if s not in sections_before and s != name]
+            if auto_created:
+                for s in auto_created:
+                    _post.remove_section(s)
+                with open(cfg_path, 'w') as f:
+                    _post.write(f)
 
         # Extract token JSON from rclone output
         full = '\n'.join(lines)

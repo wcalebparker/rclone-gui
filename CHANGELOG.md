@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.11 — Fix duplicate remotes after connecting Google Drive / Dropbox
+- rclone authorize auto-creates a section in rclone.conf (e.g. "dropbox", "drive") during OAuth — those were appearing as extra entries alongside the user's chosen name
+- Now cleans up any auto-created sections immediately after authorization completes
+
 ## v1.0.10 — Permanently fix "not open anymore" via NSApplication
 - App now uses macOS NSApplication so it is properly registered with LaunchServices
 - Clicking the app icon while it's already running sends a reopen event to the running process instead of launching a second instance — eliminating the "not open anymore" dialog completely
