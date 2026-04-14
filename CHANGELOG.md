@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.9 — Clicking the app icon always reopens the browser
+- Closing the browser tab and clicking the app icon now reliably reopens it
+- Second instance tells the running server (via HTTP) to open the browser, instead of trying to do it itself before exiting — much more reliable
+- App icon click works every time, whether the app was just started or has been running for hours
+
 ## v1.0.8 — Fix "not open anymore" dialog on re-launch
 - Fixed macOS showing "The application is not open anymore" when clicking the app icon while it's already running
 - Second launch now opens the browser to the running app and stays alive long enough that macOS doesn't treat it as a crash

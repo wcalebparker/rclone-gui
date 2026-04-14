@@ -33,7 +33,7 @@ app = Flask(__name__,
             static_folder=os.path.join(BUNDLE_DIR, 'static'))
 ANSI = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 active_jobs = {}
-APP_VERSION = "1.0.8"
+APP_VERSION = "1.0.9"
 
 def https_get(url, timeout=15):
     """Perform a simple HTTPS GET and return the response object."""
@@ -491,38 +491,61 @@ def quit_app():
     return jsonify({'ok': True})
 
 
+@app.route('/api/open-browser', methods=['POST'])
+def open_browser_route():
+    """Called by a second app instance to make the running server open the browser.
+    This is more reliable than the short-lived second process trying to call
+    webbrowser.open() itself before it exits."""
+    threading.Thread(
+        target=lambda: webbrowser.open('http://localhost:5001'), daemon=True
+    ).start()
+    return jsonify({'ok': True})
+
+
 # ── Launch ─────────────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
     import time
     print('rclone GUI → http://localhost:5001')
 
-    # When running as a bundled .app, open the browser automatically.
-    # Strategy: always start a thread that polls until port 5001 is up, then
-    # opens the browser.  Then try to start Flask.  If the port is already
-    # taken (another instance is running), Flask raises OSError — we catch it,
-    # wait long enough for the browser to open, and exit quietly.
-    # This avoids an immediate sys.exit(0) which makes macOS show
-    # "The application is not open anymore."
     if FROZEN:
         import urllib.request as _ur
 
-        def _open_browser():
-            for _ in range(40):
-                try:
-                    _ur.urlopen('http://127.0.0.1:5001', timeout=0.5)
-                    break
-                except Exception:
-                    time.sleep(0.5)
-            webbrowser.open('http://localhost:5001')
-
-        threading.Thread(target=_open_browser, daemon=True).start()
-
+        # Check if a server is already running on port 5001
+        already_running = False
         try:
+            _ur.urlopen('http://127.0.0.1:5001', timeout=1)
+            already_running = True
+        except Exception:
+            pass
+
+        if already_running:
+            # Tell the running server to open a browser tab, then exit gracefully.
+            # We do this via HTTP so the *server* process (which owns the desktop
+            # session properly) calls webbrowser.open — much more reliable than
+            # the short-lived second instance doing it.
+            try:
+                req = urllib.request.Request(
+                    'http://127.0.0.1:5001/api/open-browser',
+                    data=b'', method='POST'
+                )
+                _ur.urlopen(req, timeout=2)
+            except Exception:
+                # Fallback: try opening the browser directly
+                webbrowser.open('http://localhost:5001')
+            # Stay alive briefly so macOS doesn't show "not open anymore"
+            time.sleep(1.5)
+        else:
+            # First instance — poll until Flask is ready, then open browser
+            def _open_browser():
+                for _ in range(40):
+                    try:
+                        _ur.urlopen('http://127.0.0.1:5001', timeout=0.5)
+                        break
+                    except Exception:
+                        time.sleep(0.5)
+                webbrowser.open('http://localhost:5001')
+            threading.Thread(target=_open_browser, daemon=True).start()
             app.run(host='127.0.0.1', port=5001, debug=False, use_reloader=False)
-        except OSError:
-            # Port already in use — another instance is serving.
-            # The browser thread already opened the URL; wait for it then exit.
-            time.sleep(2)
     else:
         app.run(host='127.0.0.1', port=5001, debug=False, use_reloader=False)
