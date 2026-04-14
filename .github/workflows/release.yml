@@ -23,7 +23,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install Python dependencies
-        run: pip install flask pyinstaller pillow
+        run: pip install flask pyinstaller pillow pyobjc-framework-Cocoa certifi
 
       - name: Install create-dmg
         run: brew install create-dmg

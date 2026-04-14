@@ -27,6 +27,9 @@ a = Analysis(
         'click',
         'certifi',
         'ssl',
+        'AppKit',
+        'Foundation',
+        'objc',
     ],
     hookspath=[],
     hooksconfig={},
@@ -77,8 +80,8 @@ app = BUNDLE(
     info_plist={
         'CFBundleName': 'rclone GUI',
         'CFBundleDisplayName': 'rclone GUI',
-        'CFBundleShortVersionString': '1.0.9',
-        'CFBundleVersion': '1.0.9',
+        'CFBundleShortVersionString': '1.0.10',
+        'CFBundleVersion': '1.0.10',
         'NSHighResolutionCapable': True,
         'LSUIElement': True,          # Background agent — no dock bounce, no window required
         'LSBackgroundOnly': False,

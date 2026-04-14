@@ -33,7 +33,7 @@ app = Flask(__name__,
             static_folder=os.path.join(BUNDLE_DIR, 'static'))
 ANSI = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 active_jobs = {}
-APP_VERSION = "1.0.9"
+APP_VERSION = "1.0.10"
 
 def https_get(url, timeout=15):
     """Perform a simple HTTPS GET and return the response object."""
@@ -493,9 +493,7 @@ def quit_app():
 
 @app.route('/api/open-browser', methods=['POST'])
 def open_browser_route():
-    """Called by a second app instance to make the running server open the browser.
-    This is more reliable than the short-lived second process trying to call
-    webbrowser.open() itself before it exits."""
+    """Fallback: called via HTTP by a second instance to open the browser."""
     threading.Thread(
         target=lambda: webbrowser.open('http://localhost:5001'), daemon=True
     ).start()
@@ -509,43 +507,78 @@ if __name__ == '__main__':
     print('rclone GUI → http://localhost:5001')
 
     if FROZEN:
-        import urllib.request as _ur
-
-        # Check if a server is already running on port 5001
-        already_running = False
+        # Use macOS NSApplication so this process is properly registered with
+        # LaunchServices. Once registered, clicking the app icon in Finder while
+        # the app is already running sends applicationShouldHandleReopen: to THIS
+        # process instead of launching a second instance entirely — eliminating
+        # the "not open anymore" dialog permanently.
         try:
-            _ur.urlopen('http://127.0.0.1:5001', timeout=1)
-            already_running = True
-        except Exception:
-            pass
+            from AppKit import NSApplication, NSObject
 
-        if already_running:
-            # Tell the running server to open a browser tab, then exit gracefully.
-            # We do this via HTTP so the *server* process (which owns the desktop
-            # session properly) calls webbrowser.open — much more reliable than
-            # the short-lived second instance doing it.
+            class _AppDelegate(NSObject):
+                def applicationDidFinishLaunching_(self, _notif):
+                    # Flask must run in a background thread because NSApp.run()
+                    # owns the main thread.
+                    threading.Thread(
+                        target=lambda: app.run(
+                            host='127.0.0.1', port=5001,
+                            debug=False, use_reloader=False),
+                        daemon=True
+                    ).start()
+                    # Poll until Flask is ready, then open the browser.
+                    def _open():
+                        import urllib.request as _ur
+                        for _ in range(40):
+                            try:
+                                _ur.urlopen('http://127.0.0.1:5001', timeout=0.5)
+                                break
+                            except Exception:
+                                time.sleep(0.5)
+                        webbrowser.open('http://localhost:5001')
+                    threading.Thread(target=_open, daemon=True).start()
+
+                def applicationShouldHandleReopen_hasVisibleWindows_(self, _app, _flag):
+                    # Called when the user clicks the app icon while it is already
+                    # running — no second process is launched, this method fires
+                    # in the running process instead. Just (re)open the browser.
+                    webbrowser.open('http://localhost:5001')
+                    return True
+
+            ns_app = NSApplication.sharedApplication()
+            delegate = _AppDelegate.alloc().init()
+            ns_app.setDelegate_(delegate)
+            ns_app.run()  # Blocks on main thread; Flask runs in background thread
+
+        except ImportError:
+            # PyObjC not available — fall back to polling + HTTP open-browser
+            import urllib.request as _ur
+
+            already_running = False
             try:
-                req = urllib.request.Request(
-                    'http://127.0.0.1:5001/api/open-browser',
-                    data=b'', method='POST'
-                )
-                _ur.urlopen(req, timeout=2)
+                _ur.urlopen('http://127.0.0.1:5001', timeout=1)
+                already_running = True
             except Exception:
-                # Fallback: try opening the browser directly
-                webbrowser.open('http://localhost:5001')
-            # Stay alive briefly so macOS doesn't show "not open anymore"
-            time.sleep(1.5)
-        else:
-            # First instance — poll until Flask is ready, then open browser
-            def _open_browser():
-                for _ in range(40):
-                    try:
-                        _ur.urlopen('http://127.0.0.1:5001', timeout=0.5)
-                        break
-                    except Exception:
-                        time.sleep(0.5)
-                webbrowser.open('http://localhost:5001')
-            threading.Thread(target=_open_browser, daemon=True).start()
-            app.run(host='127.0.0.1', port=5001, debug=False, use_reloader=False)
+                pass
+
+            if already_running:
+                try:
+                    req = urllib.request.Request(
+                        'http://127.0.0.1:5001/api/open-browser',
+                        data=b'', method='POST')
+                    _ur.urlopen(req, timeout=2)
+                except Exception:
+                    webbrowser.open('http://localhost:5001')
+                time.sleep(10)
+            else:
+                def _open_browser():
+                    for _ in range(40):
+                        try:
+                            _ur.urlopen('http://127.0.0.1:5001', timeout=0.5)
+                            break
+                        except Exception:
+                            time.sleep(0.5)
+                    webbrowser.open('http://localhost:5001')
+                threading.Thread(target=_open_browser, daemon=True).start()
+                app.run(host='127.0.0.1', port=5001, debug=False, use_reloader=False)
     else:
         app.run(host='127.0.0.1', port=5001, debug=False, use_reloader=False)

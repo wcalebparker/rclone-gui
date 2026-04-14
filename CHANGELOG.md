@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.10 — Permanently fix "not open anymore" via NSApplication
+- App now uses macOS NSApplication so it is properly registered with LaunchServices
+- Clicking the app icon while it's already running sends a reopen event to the running process instead of launching a second instance — eliminating the "not open anymore" dialog completely
+- Closing the browser tab and clicking the icon will always reopen the browser
+
 ## v1.0.9 — Clicking the app icon always reopens the browser
 - Closing the browser tab and clicking the app icon now reliably reopens it
 - Second instance tells the running server (via HTTP) to open the browser, instead of trying to do it itself before exiting — much more reliable
