@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.8 — Fix "not open anymore" dialog on re-launch
+- Fixed macOS showing "The application is not open anymore" when clicking the app icon while it's already running
+- Second launch now opens the browser to the running app and stays alive long enough that macOS doesn't treat it as a crash
+- Removed the immediate sys.exit(0) that confused macOS's app lifecycle tracking
+
 ## v1.0.7 — Fix SSL certificate error when downloading rclone (proper fix)
 - Correctly bundled certifi's CA certificate file (cacert.pem) as a data file inside the app
 - Set SSL_CERT_FILE environment variable at startup so all HTTPS connections use the bundled certs

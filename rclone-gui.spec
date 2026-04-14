@@ -77,8 +77,8 @@ app = BUNDLE(
     info_plist={
         'CFBundleName': 'rclone GUI',
         'CFBundleDisplayName': 'rclone GUI',
-        'CFBundleShortVersionString': '1.0.7',
-        'CFBundleVersion': '1.0.7',
+        'CFBundleShortVersionString': '1.0.8',
+        'CFBundleVersion': '1.0.8',
         'NSHighResolutionCapable': True,
         'LSUIElement': True,          # Background agent — no dock bounce, no window required
         'LSBackgroundOnly': False,

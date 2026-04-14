@@ -33,7 +33,7 @@ app = Flask(__name__,
             static_folder=os.path.join(BUNDLE_DIR, 'static'))
 ANSI = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 active_jobs = {}
-APP_VERSION = "1.0.7"
+APP_VERSION = "1.0.8"
 
 def https_get(url, timeout=15):
     """Perform a simple HTTPS GET and return the response object."""
@@ -498,23 +498,15 @@ if __name__ == '__main__':
     print('rclone GUI → http://localhost:5001')
 
     # When running as a bundled .app, open the browser automatically.
-    # Poll until Flask is actually serving before opening — don't guess with a timer.
+    # Strategy: always start a thread that polls until port 5001 is up, then
+    # opens the browser.  Then try to start Flask.  If the port is already
+    # taken (another instance is running), Flask raises OSError — we catch it,
+    # wait long enough for the browser to open, and exit quietly.
+    # This avoids an immediate sys.exit(0) which makes macOS show
+    # "The application is not open anymore."
     if FROZEN:
-        # Check if another instance is already running
         import urllib.request as _ur
-        already_running = False
-        try:
-            _ur.urlopen('http://127.0.0.1:5001', timeout=0.5)
-            already_running = True
-        except Exception:
-            pass
 
-        if already_running:
-            # Just open the browser to the existing instance and exit
-            webbrowser.open('http://localhost:5001')
-            sys.exit(0)
-
-        # Not running yet — open browser once Flask is ready
         def _open_browser():
             for _ in range(40):
                 try:
@@ -523,6 +515,14 @@ if __name__ == '__main__':
                 except Exception:
                     time.sleep(0.5)
             webbrowser.open('http://localhost:5001')
+
         threading.Thread(target=_open_browser, daemon=True).start()
 
-    app.run(host='127.0.0.1', port=5001, debug=False, use_reloader=False)
+        try:
+            app.run(host='127.0.0.1', port=5001, debug=False, use_reloader=False)
+        except OSError:
+            # Port already in use — another instance is serving.
+            # The browser thread already opened the URL; wait for it then exit.
+            time.sleep(2)
+    else:
+        app.run(host='127.0.0.1', port=5001, debug=False, use_reloader=False)
