@@ -11,6 +11,18 @@ FROZEN      = getattr(sys, 'frozen', False)
 BUNDLE_DIR  = sys._MEIPASS if FROZEN else os.path.dirname(os.path.abspath(__file__))
 APP_DIR     = os.path.dirname(sys.executable) if FROZEN else os.path.dirname(os.path.abspath(__file__))
 
+# ── SSL certificate fix ────────────────────────────────────────────────────
+# PyInstaller strips macOS system SSL cert paths.  We bundle certifi's
+# cacert.pem as a data file (see rclone-gui.spec datas list) and point the
+# two standard env-vars at it *before* any network code runs.  This is more
+# reliable than passing cafile= to each ssl.create_default_context() call
+# because it also covers any library that opens its own SSL connections.
+if FROZEN:
+    _cert_file = os.path.join(BUNDLE_DIR, 'certifi', 'cacert.pem')
+    if os.path.isfile(_cert_file):
+        os.environ['SSL_CERT_FILE']      = _cert_file
+        os.environ['REQUESTS_CA_BUNDLE'] = _cert_file
+
 # When bundled, store rclone in ~/Library/Application Support so it persists
 # across app updates (the .app bundle itself is read-only after install).
 RCLONE_DATA_DIR = os.path.expanduser('~/Library/Application Support/rclone-gui')
@@ -21,22 +33,12 @@ app = Flask(__name__,
             static_folder=os.path.join(BUNDLE_DIR, 'static'))
 ANSI = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 active_jobs = {}
-APP_VERSION = "1.0.6"
-
-def ssl_ctx():
-    """Return an SSL context that works inside a PyInstaller bundle.
-    Uses certifi's bundled CA certificates so HTTPS works without
-    relying on macOS system certificate paths (which PyInstaller can't find)."""
-    try:
-        import certifi
-        return ssl.create_default_context(cafile=certifi.where())
-    except Exception:
-        return ssl.create_default_context()
+APP_VERSION = "1.0.7"
 
 def https_get(url, timeout=15):
     """Perform a simple HTTPS GET and return the response object."""
     req = urllib.request.Request(url, headers={'User-Agent': f'rclone-gui/{APP_VERSION}'})
-    return urllib.request.urlopen(req, timeout=timeout, context=ssl_ctx())
+    return urllib.request.urlopen(req, timeout=timeout)
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
@@ -123,7 +125,7 @@ def check_app_update():
         req = urllib.request.Request(
             'https://api.github.com/repos/wcalebparker/rclone-gui/releases/latest',
             headers={'User-Agent': 'rclone-gui/' + APP_VERSION, 'Accept': 'application/vnd.github+json'})
-        with urllib.request.urlopen(req, timeout=8, context=ssl_ctx()) as resp:
+        with urllib.request.urlopen(req, timeout=8) as resp:
             data = json.loads(resp.read().decode())
         latest = data.get('tag_name', '').lstrip('v')
         if not latest:

@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.7 — Fix SSL certificate error when downloading rclone (proper fix)
+- Correctly bundled certifi's CA certificate file (cacert.pem) as a data file inside the app
+- Set SSL_CERT_FILE environment variable at startup so all HTTPS connections use the bundled certs
+- rclone download and version checks now work reliably inside the packaged app
+
 ## v1.0.6 — Fix SSL certificate error when downloading rclone
 - Fixed "CERTIFICATE_VERIFY_FAILED" error on first launch when downloading rclone
 - Bundled SSL certificates (certifi) so HTTPS works inside the packaged app

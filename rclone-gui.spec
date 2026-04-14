@@ -3,6 +3,7 @@
 # Build with:  pyinstaller rclone-gui.spec
 
 import os
+import certifi
 block_cipher = None
 
 a = Analysis(
@@ -12,6 +13,9 @@ a = Analysis(
     datas=[
         ('templates', 'templates'),
         ('static',    'static'),
+        # Bundle certifi's CA certificate file so HTTPS works inside the packaged app.
+        # certifi.where() returns the absolute path to cacert.pem on the build machine.
+        (certifi.where(), 'certifi'),
     ],
     hiddenimports=[
         'flask',
@@ -73,8 +77,8 @@ app = BUNDLE(
     info_plist={
         'CFBundleName': 'rclone GUI',
         'CFBundleDisplayName': 'rclone GUI',
-        'CFBundleShortVersionString': '1.0.6',
-        'CFBundleVersion': '1.0.6',
+        'CFBundleShortVersionString': '1.0.7',
+        'CFBundleVersion': '1.0.7',
         'NSHighResolutionCapable': True,
         'LSUIElement': True,          # Background agent — no dock bounce, no window required
         'LSBackgroundOnly': False,
