@@ -395,6 +395,14 @@ body {
   display: flex; align-items: center; gap: 9px;
   padding: 9px 12px; cursor: pointer; font-size: 14px; transition: background 0.1s;
 }
+.rp-opt-remove {
+  margin-left: auto; flex-shrink: 0;
+  opacity: 0; background: none; border: none; cursor: pointer;
+  color: var(--red); font-size: 13px; padding: 2px 5px; border-radius: 4px;
+  line-height: 1; transition: opacity 0.15s, background 0.15s;
+}
+.rp-option:hover .rp-opt-remove { opacity: 0.6; }
+.rp-opt-remove:hover { opacity: 1 !important; background: rgba(255,80,80,0.12); }
 .rp-option:hover   { background: rgba(212,98,42,0.1); }
 .rp-option.active  { background: rgba(212,98,42,0.16); }
 .rp-opt-icon { width: 18px; height: 18px; object-fit: contain; flex-shrink: 0; }
@@ -1205,6 +1213,17 @@ function buildRPPanel(side, options) {
                        <span class="rp-opt-label">${label}</span>`;
     }
     row.onclick = () => { selectRP(side, value); };
+
+    // Add a remove button for every cloud remote (not "This Computer")
+    if (value !== 'local') {
+      const btn = document.createElement('button');
+      btn.className = 'rp-opt-remove';
+      btn.textContent = '✕';
+      btn.title = 'Remove this connection';
+      btn.onclick = e => { e.stopPropagation(); removeRemote(value); };
+      row.appendChild(btn);
+    }
+
     panel.appendChild(row);
   });
 }
@@ -1261,6 +1280,20 @@ async function refreshRemotes() {
   const d = await r.json();
   allRemotes = d.remotes || [];
   buildRemoteDropdowns();
+}
+
+async function removeRemote(remote) {
+  const name = remote.replace(/:$/, '');
+  if (!confirm(`Remove "${name}"?\n\nThis disconnects it from the app. Your files are not deleted.`)) return;
+  // Close any open picker first
+  document.querySelectorAll('.rp-panel').forEach(p => p.classList.remove('open'));
+  document.querySelectorAll('.rp-trigger').forEach(t => t.classList.remove('open'));
+  await fetch('/api/delete-remote', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name })
+  });
+  await refreshRemotes();
 }
 
 function onSrcRemoteChange() {

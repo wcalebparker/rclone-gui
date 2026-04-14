@@ -33,7 +33,7 @@ app = Flask(__name__,
             static_folder=os.path.join(BUNDLE_DIR, 'static'))
 ANSI = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 active_jobs = {}
-APP_VERSION = "1.0.11"
+APP_VERSION = "1.0.12"
 
 def https_get(url, timeout=15):
     """Perform a simple HTTPS GET and return the response object."""

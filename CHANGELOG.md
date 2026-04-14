@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.12 — Remove connection button
+- Hover over any cloud storage in the From/To dropdowns to reveal a ✕ button
+- Clicking ✕ asks for confirmation then removes that connection (files are not deleted)
+
 ## v1.0.11 — Fix duplicate remotes after connecting Google Drive / Dropbox
 - rclone authorize auto-creates a section in rclone.conf (e.g. "dropbox", "drive") during OAuth — those were appearing as extra entries alongside the user's chosen name
 - Now cleans up any auto-created sections immediately after authorization completes
